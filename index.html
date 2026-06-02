@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>客户管理系统</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ========== 登录/注册区域 ========== -->
+  <div id="auth-section">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>客户管理系统</h1>
+        <p>阿里巴巴商家专用</p>
+      </div>
+
+      <form id="register-form">
+        <h2>首次使用 · 设置密码</h2>
+        <div class="form-group">
+          <label>显示名称（可选）</label>
+          <input type="text" id="register-name" placeholder="如：张经理">
+        </div>
+        <div class="form-group">
+          <label>登录密码 <span class="required">*</span></label>
+          <input type="password" id="register-password" placeholder="请设置密码（至少4位）" required minlength="4">
+        </div>
+        <div id="register-error" class="error-msg" style="display:none;"></div>
+        <button type="submit" class="btn btn-primary btn-full">创建账号</button>
+      </form>
+
+      <form id="login-form" style="display:none;">
+        <h2>登录</h2>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" id="login-password" placeholder="请输入密码" required>
+        </div>
+        <div id="auth-error" class="error-msg" style="display:none;"></div>
+        <button type="submit" class="btn btn-primary btn-full">登 录</button>
+        <p class="auth-switch">
+          <a href="#" id="show-register">重置系统（清除所有数据）</a>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========== 主应用区域 ========== -->
+  <div id="app-section" style="display:none;">
+
+    <header id="topbar">
+      <div class="brand">客户管理系统</div>
+      <div class="user-menu">
+        <span id="user-name"></span>
+        <button id="btn-logout" class="btn btn-sm">退出</button>
+      </div>
+    </header>
+
+    <div id="app-layout">
+      <nav id="sidebar">
+        <a href="#" class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">📊</span> 仪表盘
+        </a>
+        <a href="#" class="nav-item" data-view="customers">
+          <span class="nav-icon">👥</span> 客户管理
+        </a>
+        <a href="#" class="nav-item" data-view="orders">
+          <span class="nav-icon">📋</span> 定制订单
+        </a>
+        <a href="#" class="nav-item" data-view="inventory">
+          <span class="nav-icon">📦</span> 库存管理
+        </a>
+      </nav>
+
+      <main id="content">
+
+        <!-- 仪表盘 -->
+        <div id="view-dashboard" class="view active">
+          <h2 class="page-title">仪表盘</h2>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-number" id="stat-total-customers">0</div>
+              <div class="stat-label">客户总数</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number" id="stat-new-customers">0</div>
+              <div class="stat-label">本月新增客户</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number" id="stat-active-orders">-</div>
+              <div class="stat-label">进行中订单</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number" id="stat-low-stock">-</div>
+              <div class="stat-label">库存不足提醒</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 客户管理 -->
+        <div id="view-customers" class="view">
+          <div class="page-header">
+            <h2 class="page-title">客户管理</h2>
+            <div><button id="btn-export-customers" class="btn">导出Excel</button><button id="btn-add-customer" class="btn btn-primary" style="margin-left:8px;">+ 新增客户</button></div>
+          </div>
+          <div class="toolbar">
+            <input type="text" id="customer-search" class="search-input" placeholder="搜索客户姓名、公司名、国家...">
+            <select id="customer-status-filter" class="filter-select">
+              <option value="">全部状态</option>
+              <option value="潜在客户">潜在客户</option>
+              <option value="已成交客户">已成交客户</option>
+              <option value="长期客户">长期客户</option>
+              <option value="流失客户">流失客户</option>
+            </select>
+            <select id="customer-level-filter" class="filter-select">
+              <option value="">全部等级</option>
+              <option value="VIP">VIP</option>
+              <option value="普通">普通</option>
+              <option value="潜在">潜在</option>
+            </select>
+          </div>
+          <div class="table-container">
+            <table id="customer-table">
+              <thead>
+                <tr><th>客户姓名</th><th>公司名称</th><th>国家</th><th>电话</th><th>等级</th><th>状态</th><th>最近联系</th><th>操作</th></tr>
+              </thead>
+              <tbody id="customer-table-body">
+                <tr><td colspan="8" class="empty-state">暂无客户数据</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 定制订单 -->
+        <div id="view-orders" class="view">
+          <div class="page-header">
+            <h2 class="page-title">定制订单</h2>
+            <div><button id="btn-export-orders" class="btn">导出Excel</button><button id="btn-add-order" class="btn btn-primary" style="margin-left:8px;">+ 新增订单</button></div>
+          </div>
+          <div class="toolbar">
+            <input type="text" id="order-search" class="search-input" placeholder="搜索客户名称、产品名...">
+            <select id="order-status-filter" class="filter-select">
+              <option value="">全部状态</option>
+              <option value="沟通中">沟通中</option><option value="打样中">打样中</option>
+              <option value="已报价">已报价</option><option value="已下单">已下单</option>
+              <option value="生产中">生产中</option><option value="已发货">已发货</option>
+              <option value="已完成">已完成</option>
+            </select>
+            <select id="order-customer-filter" class="filter-select">
+              <option value="">全部客户</option>
+            </select>
+          </div>
+          <div class="table-container">
+            <table id="order-table">
+              <thead>
+                <tr><th>客户</th><th>产品名称</th><th>数量</th><th>报价(¥)</th><th>交期</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
+              </thead>
+              <tbody id="order-table-body">
+                <tr><td colspan="8" class="empty-state">暂无订单数据</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 包材管理（按客户 → 按产品） -->
+        <div id="view-inventory" class="view">
+          <div class="page-header">
+            <h2 class="page-title">包材管理</h2>
+          </div>
+          <div class="toolbar">
+            <select id="material-customer-select" class="filter-select" style="min-width:250px;">
+              <option value="">请选择客户</option>
+            </select>
+          </div>
+
+          <!-- 产品包材列表 -->
+          <div id="material-summary" style="display:none;">
+            <h3 style="margin-bottom:12px;color:#555;">定制产品包材一览</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr><th>产品名称</th><th>入库累计</th><th>出库累计</th><th>剩余包材</th><th>操作</th></tr>
+                </thead>
+                <tbody id="material-products-body">
+                  <tr><td colspan="5" class="empty-state">该客户暂无定制产品</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 某产品的出入库明细 -->
+            <div id="material-records-section" style="display:none;margin-top:24px;">
+              <h3 style="margin-bottom:4px;color:#555;">出入库记录 - <span id="material-records-product-name"></span></h3>
+              <button id="btn-back-to-products" class="btn btn-sm" style="margin-bottom:12px;">← 返回产品列表</button>
+              <button id="btn-export-records" class="btn btn-sm" style="margin-bottom:12px;margin-left:8px;">导出Excel</button>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr><th>时间</th><th>类型</th><th>数量</th><th>备注</th><th>操作</th></tr>
+                  </thead>
+                  <tbody id="material-records-body">
+                    <tr><td colspan="5" class="empty-state">暂无记录</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div id="material-no-customer" class="empty-state" style="padding:60px;text-align:center;color:#aaa;">
+            请在上方选择一个客户，查看其定制产品的包材情况
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ========== 客户表单弹窗 ========== -->
+  <div id="customer-modal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header"><h3 id="customer-modal-title">新增客户</h3><button class="btn-close" id="btn-close-modal">&times;</button></div>
+      <div class="modal-body">
+        <form id="customer-form">
+          <input type="hidden" id="customer-id">
+          <div class="form-row">
+            <div class="form-group"><label>客户姓名 <span class="required">*</span></label><input type="text" id="customer-name" required placeholder="必填"></div>
+            <div class="form-group"><label>公司名称</label><input type="text" id="customer-company" placeholder="选填"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>国家/地区</label><input type="text" id="customer-country" placeholder="如：美国"></div>
+            <div class="form-group"><label>电话</label><input type="text" id="customer-phone" placeholder="如：+1 555-0123"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>微信</label><input type="text" id="customer-wechat" placeholder="选填"></div>
+            <div class="form-group"><label>阿里店铺来源</label><input type="text" id="customer-source" placeholder="如：阿里国际站-店铺名"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>客户等级</label><select id="customer-level"><option value="潜在">潜在</option><option value="普通">普通</option><option value="VIP">VIP</option></select></div>
+            <div class="form-group"><label>客户状态</label><select id="customer-status"><option value="潜在客户">潜在客户</option><option value="已成交客户">已成交客户</option><option value="长期客户">长期客户</option><option value="流失客户">流失客户</option></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>首次联系时间</label><input type="date" id="customer-first-contact"></div>
+            <div class="form-group"><label>最近联系时间</label><input type="date" id="customer-last-contact"></div>
+          </div>
+          <div class="form-group"><label>备注</label><textarea id="customer-notes" rows="3" placeholder="选填"></textarea></div>
+          <div class="modal-footer">
+            <button type="button" class="btn" id="btn-cancel-form">取消</button>
+            <button type="submit" class="btn btn-primary">保 存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 订单表单弹窗 ========== -->
+  <div id="order-modal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header"><h3 id="order-modal-title">新增订单</h3><button class="btn-close" id="btn-close-order-modal">&times;</button></div>
+      <div class="modal-body">
+        <form id="order-form">
+          <input type="hidden" id="order-id">
+          <div class="form-row">
+            <div class="form-group"><label>选择客户 <span class="required">*</span></label><select id="order-customer" required><option value="">请选择客户</option></select></div>
+            <div class="form-group"><label>产品名称 <span class="required">*</span></label><input type="text" id="order-product-name" required placeholder="必填"></div>
+          </div>
+          <div class="form-group"><label>尺寸</label><input type="text" id="order-size" placeholder="如：M / L / XL / 10cm×20cm"></div>
+          <div class="form-group"><label>商标要求</label><textarea id="order-logo-requirements" rows="2" placeholder="如：胸前印logo，尺寸5cm，单色..."></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label>报价金额 (人民币)</label><input type="number" id="order-quotation-price" step="0.01" placeholder="如：35.00"></div>
+            <div class="form-group"><label>订单数量</label><input type="number" id="order-quantity" placeholder="如：1000"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>是否含税</label><select id="order-tax-included"><option value="">未选择</option><option value="含税">含税</option><option value="不含税">不含税</option></select></div>
+            <div class="form-group"><label>是否含运费</label><select id="order-shipping-included"><option value="">未选择</option><option value="含运费">含运费</option><option value="不含运费">不含运费</option></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>交期</label><input type="date" id="order-delivery-date"></div>
+            <div class="form-group"><label>订单状态</label><select id="order-status"><option value="沟通中">沟通中</option><option value="打样中">打样中</option><option value="已报价">已报价</option><option value="已下单">已下单</option><option value="生产中">生产中</option><option value="已发货">已发货</option><option value="已完成">已完成</option></select></div>
+          </div>
+          <div class="form-group"><label>打样记录</label><textarea id="order-sample-record" rows="2" placeholder="如：2026-03-15 寄出样品给客户确认"></textarea></div>
+          <div class="form-group"><label>沟通备注</label><textarea id="order-communication-notes" rows="3" placeholder="记录每次与客户沟通的要点..."></textarea></div>
+          <div class="modal-footer">
+            <button type="button" class="btn" id="btn-cancel-order-form">取消</button>
+            <button type="submit" class="btn btn-primary">保 存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 包材入库/出库弹窗 ========== -->
+  <div id="material-modal" class="modal-overlay" style="display:none;">
+    <div class="modal modal-sm">
+      <div class="modal-header"><h3 id="material-modal-title">入库</h3><button class="btn-close" id="btn-close-material-modal">&times;</button></div>
+      <div class="modal-body">
+        <form id="material-form">
+          <input type="hidden" id="material-id">
+          <input type="hidden" id="material-customer-id">
+          <input type="hidden" id="material-product-name">
+          <input type="hidden" id="material-type">
+          <p style="margin-bottom:12px;color:#888;" id="material-customer-info"></p>
+          <div class="form-group">
+            <label>数量 <span class="required">*</span></label>
+            <input type="number" id="material-quantity" required placeholder="请输入包材数量" min="1">
+          </div>
+          <div class="form-group">
+            <label>备注</label>
+            <input type="text" id="material-notes" placeholder="如：发货使用 / 采购入库">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn" id="btn-cancel-material-form">取消</button>
+            <button type="submit" class="btn btn-primary">确 认</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 删除确认弹窗 ========== -->
+  <div id="confirm-modal" class="modal-overlay" style="display:none;">
+    <div class="modal modal-sm">
+      <div class="modal-header"><h3>确认删除</h3></div>
+      <div class="modal-body">
+        <p id="confirm-message">确定要删除吗？此操作不可撤销。</p>
+        <div class="modal-footer">
+          <button class="btn" id="btn-cancel-confirm">取消</button>
+          <button class="btn btn-danger" id="btn-confirm-delete">确认删除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" style="display:none;"></div>
+  <script src="app.js"></script>
+</body>
+</html>
