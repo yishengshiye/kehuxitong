@@ -232,7 +232,6 @@ async function _pullDeletedIds(fileName) {
     }
   }
 }
-}
 
 // ========== 认证 ==========
 function getUsers() {
