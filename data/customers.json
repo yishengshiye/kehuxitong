@@ -1,22 +1,5 @@
 [
   {
-    "name": "李潮汕",
-    "company_name": "",
-    "country": "",
-    "phone": "",
-    "wechat": "",
-    "source": "",
-    "customer_level": "潜在",
-    "status": "潜在客户",
-    "first_contact_date": null,
-    "last_contact_date": null,
-    "notes": "",
-    "id": "mpza3jwz_yf3fax",
-    "user_id": "田一丁",
-    "created_at": "2026-06-04T09:14:06.611Z",
-    "updated_at": "2026-06-04T09:14:06.611Z"
-  },
-  {
     "name": "小野总",
     "company_name": "",
     "country": "浙江",
