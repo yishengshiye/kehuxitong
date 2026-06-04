@@ -1,22 +1,5 @@
 [
   {
-    "name": "萧总",
-    "company_name": "个人",
-    "country": "云南",
-    "phone": "",
-    "wechat": "xiaoshunshou2638",
-    "source": "医圣",
-    "customer_level": "普通",
-    "status": "已成交客户",
-    "first_contact_date": null,
-    "last_contact_date": null,
-    "notes": "",
-    "id": "mpz5egjh_9r31et",
-    "user_id": "local",
-    "created_at": "2026-06-04T07:02:37.373Z",
-    "updated_at": "2026-06-04T07:02:37.373Z"
-  },
-  {
     "name": "杨总",
     "company_name": "个体户",
     "country": "南阳",
