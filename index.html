@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>客户管理系统</title>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -40,6 +40,14 @@
         <div class="form-group">
           <label>答案 <span class="required">*</span></label>
           <input type="text" id="register-security-answer" placeholder="请记住此答案，用于找回密码" required>
+        </div>
+        <div class="form-group" id="register-role-group">
+          <label>角色 <span class="required">*</span></label>
+          <select id="register-role" required>
+            <option value="">请选择角色</option>
+            <option value="业务员">业务员</option>
+            <option value="总经理">总经理</option>
+          </select>
         </div>
         <div id="register-error" class="error-msg" style="display:none;"></div>
         <button type="submit" class="btn btn-primary btn-full">创建账号</button>
@@ -390,6 +398,6 @@
   </div>
 
   <div id="toast" class="toast" style="display:none;"></div>
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

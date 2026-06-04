@@ -31,6 +31,30 @@ async function hashPassword(password) {
   return Array.from(new Uint8Array(hash)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
 }
 
+// ========== 权限 ==========
+function getCurrentUser() { return sessionStorage.getItem('crm_logged_user') || ''; }
+function getCurrentRole() { return sessionStorage.getItem('crm_role') || '总经理'; }
+function isManager() { return getCurrentRole() === '总经理'; }
+
+function getVisibleCustomers() {
+  if (isManager()) return allCustomers;
+  var u = getCurrentUser();
+  return allCustomers.filter(function(c) { return c.user_id === u; });
+}
+function getVisibleOrders() {
+  if (isManager()) return allOrders;
+  var u = getCurrentUser();
+  return allOrders.filter(function(o) { return o.user_id === u; });
+}
+function getVisibleMaterialRecords() {
+  if (isManager()) return allMaterialRecords;
+  var u = getCurrentUser();
+  var myIds = [];
+  allCustomers.forEach(function(c) { if (c.user_id === u) myIds.push(c.id); });
+  if (!myIds.length) return [];
+  return allMaterialRecords.filter(function(r) { return myIds.indexOf(r.customer_id) !== -1; });
+}
+
 // ========== 存储 ==========
 function storageGet(key) { try { var r = localStorage.getItem(key); return r ? JSON.parse(r) : null; } catch(e) { return null; } }
 function storageSet(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
@@ -195,6 +219,12 @@ function showAuthForms() {
   if (!isRegistered()) {
     document.getElementById('login-form').style.display = 'none';
     document.getElementById('register-form').style.display = 'block';
+    // 首个用户自动为总经理，隐藏角色选择器
+    document.getElementById('register-role').value = '总经理';
+    document.getElementById('register-role-group').style.display = 'none';
+  } else {
+    document.getElementById('register-role-group').style.display = 'block';
+    document.getElementById('register-role').value = '';
   }
   // 云同步配置提示
   document.getElementById('token-setup').style.display = cloudEnabled() ? 'none' : 'block';
@@ -206,6 +236,14 @@ function showRegisterForm() {
   document.getElementById('register-form').style.display = 'block';
   document.getElementById('forgot-password-form').style.display = 'none';
   document.getElementById('register-error').style.display = 'none';
+  // 无用户时自动总经理，有用户时显示角色选择
+  if (getUsers().length === 0) {
+    document.getElementById('register-role').value = '总经理';
+    document.getElementById('register-role-group').style.display = 'none';
+  } else {
+    document.getElementById('register-role-group').style.display = 'block';
+    document.getElementById('register-role').value = '';
+  }
 }
 
 function showLoginForm() {
@@ -241,18 +279,23 @@ async function handleRegister(e) {
   if (!pw || pw.length < 4) { err.textContent = '密码至少需要4位'; err.style.display = 'block'; return; }
   if (!question) { err.textContent = '请选择安全问题'; err.style.display = 'block'; return; }
   if (!answer) { err.textContent = '请填写安全问题的答案'; err.style.display = 'block'; return; }
+  // 角色：首个用户自动总经理
+  var existing = getUsers();
+  var role = existing.length === 0 ? '总经理' : document.getElementById('register-role').value;
+  if (!role) { err.textContent = '请选择角色'; err.style.display = 'block'; return; }
   err.style.display = 'none';
   var hash = await hashPassword(pw);
   var answerHash = await hashPassword(answer);
   var users = getUsers();
-  users.push({ username: username, name: username, passwordHash: hash, securityQuestion: question, securityAnswer: answerHash, createdAt: new Date().toISOString() });
+  users.push({ username: username, name: username, passwordHash: hash, securityQuestion: question, securityAnswer: answerHash, role: role, createdAt: new Date().toISOString() });
   saveUsers(users);
-  // 等待云端同步完成
   if (cloudEnabled()) {
     var ok = await cloudPush('users', { users: users });
     if (!ok) { setTimeout(function() { toast('⚠ 云端同步失败，请稍后刷新页面重试', 'error'); }, 500); }
   }
   sessionStorage.setItem(STORAGE_KEY.SESSION, '1');
+  sessionStorage.setItem('crm_logged_user', username);
+  sessionStorage.setItem('crm_role', role);
   enterApp(username);
 }
 
@@ -268,6 +311,8 @@ async function handleLogin(e) {
   var inputHash = await hashPassword(pw);
   if (inputHash !== user.passwordHash) { err.textContent = '密码错误，请重试'; err.style.display = 'block'; return; }
   sessionStorage.setItem(STORAGE_KEY.SESSION, '1');
+  sessionStorage.setItem('crm_logged_user', user.name || username);
+  sessionStorage.setItem('crm_role', user.role || '总经理');
   enterApp(user.name || username);
 }
 
@@ -326,6 +371,8 @@ async function handleForgotReset() {
 
 function handleLogout() {
   sessionStorage.removeItem(STORAGE_KEY.SESSION);
+  sessionStorage.removeItem('crm_logged_user');
+  sessionStorage.removeItem('crm_role');
   document.getElementById('auth-section').style.display = 'flex';
   document.getElementById('app-section').style.display = 'none';
   showAuthForms();
@@ -334,7 +381,8 @@ function handleLogout() {
 function enterApp(userName) {
   document.getElementById('auth-section').style.display = 'none';
   document.getElementById('app-section').style.display = 'flex';
-  document.getElementById('user-name').textContent = userName;
+  var role = getCurrentRole();
+  document.getElementById('user-name').textContent = userName + ' (' + role + ')';
   sessionStorage.setItem('crm_logged_user', userName);
   switchView('dashboard');
   loadDashboard();
@@ -361,7 +409,7 @@ function switchView(viewName) {
 // ================================================================
 //                      客 户
 // ================================================================
-function loadCustomers() { allCustomers = storageGet(STORAGE_KEY.CUSTOMERS) || []; renderCustomerTable(allCustomers); updateCustomerDropdowns(); }
+function loadCustomers() { allCustomers = storageGet(STORAGE_KEY.CUSTOMERS) || []; renderCustomerTable(getVisibleCustomers()); updateCustomerDropdowns(); }
 function saveCustomers() { storageSet(STORAGE_KEY.CUSTOMERS, allCustomers); cloudPush('customers', allCustomers); }
 
 function renderCustomerTable(customers) {
@@ -385,7 +433,7 @@ function filterCustomers() {
   var s = document.getElementById('customer-search').value.toLowerCase().trim();
   var sf = document.getElementById('customer-status-filter').value;
   var lf = document.getElementById('customer-level-filter').value;
-  var f = allCustomers;
+  var f = getVisibleCustomers();
   if (s) f = f.filter(function(c) { return (c.name && c.name.toLowerCase().indexOf(s) !== -1) || (c.company_name && c.company_name.toLowerCase().indexOf(s) !== -1) || (c.country && c.country.toLowerCase().indexOf(s) !== -1) || (c.phone && c.phone.toLowerCase().indexOf(s) !== -1); });
   if (sf) f = f.filter(function(c) { return c.status === sf; });
   if (lf) f = f.filter(function(c) { return c.customer_level === lf; });
@@ -438,27 +486,27 @@ function saveCustomer(e) {
   if (editingCustomerId) {
     var i = allCustomers.findIndex(function(x) { return x.id === editingCustomerId; });
     if (i !== -1) { d.id = editingCustomerId; d.user_id = allCustomers[i].user_id; d.created_at = allCustomers[i].created_at; d.updated_at = now; allCustomers[i] = d; }
-  } else { d.id = genId(); d.user_id = 'local'; d.created_at = now; d.updated_at = now; allCustomers.unshift(d); }
+  } else { d.id = genId(); d.user_id = getCurrentUser(); d.created_at = now; d.updated_at = now; allCustomers.unshift(d); }
   saveCustomers();
   toast(editingCustomerId ? '客户信息已更新' : '客户添加成功', 'success');
-  closeCustomerModal(); renderCustomerTable(allCustomers); updateCustomerDropdowns(); loadDashboard();
+  closeCustomerModal(); renderCustomerTable(getVisibleCustomers()); updateCustomerDropdowns(); loadDashboard();
 }
 
 // ================================================================
 //                      订 单
 // ================================================================
-function loadOrders() { allOrders = storageGet(STORAGE_KEY.ORDERS) || []; renderOrderTable(allOrders); updateOrderCustomerFilter(); }
+function loadOrders() { allOrders = storageGet(STORAGE_KEY.ORDERS) || []; renderOrderTable(getVisibleOrders()); updateOrderCustomerFilter(); }
 function saveOrders() { storageSet(STORAGE_KEY.ORDERS, allOrders); cloudPush('orders', allOrders); }
 
 function updateCustomerDropdowns() {
-  var cs = storageGet(STORAGE_KEY.CUSTOMERS) || [];
+  var cs = getVisibleCustomers();
   var opts = cs.map(function(c) { return '<option value="' + c.id + '">' + esc(c.name) + (c.company_name ? ' - ' + esc(c.company_name) : '') + '</option>'; }).join('');
   var sel = document.getElementById('order-customer');
   if (sel) sel.innerHTML = '<option value="">请选择客户</option>' + opts;
 }
 
 function updateOrderCustomerFilter() {
-  var cs = storageGet(STORAGE_KEY.CUSTOMERS) || [];
+  var cs = getVisibleCustomers();
   var opts = cs.map(function(c) { return '<option value="' + c.id + '">' + esc(c.name) + '</option>'; }).join('');
   var f = document.getElementById('order-customer-filter');
   if (f) f.innerHTML = '<option value="">全部客户</option>' + opts;
@@ -486,7 +534,7 @@ function filterOrders() {
   var s = document.getElementById('order-search').value.toLowerCase().trim();
   var sf = document.getElementById('order-status-filter').value;
   var cf = document.getElementById('order-customer-filter').value;
-  var f = allOrders;
+  var f = getVisibleOrders();
   if (s) f = f.filter(function(o) { return (o.product_name && o.product_name.toLowerCase().indexOf(s) !== -1) || getCustName(o.customer_id).toLowerCase().indexOf(s) !== -1; });
   if (sf) f = f.filter(function(o) { return o.status === sf; });
   if (cf) f = f.filter(function(o) { return o.customer_id === cf; });
@@ -540,10 +588,10 @@ function saveOrder(e) {
   if (editingOrderId) {
     var i = allOrders.findIndex(function(x) { return x.id === editingOrderId; });
     if (i !== -1) { d.id = editingOrderId; d.user_id = allOrders[i].user_id; d.created_at = allOrders[i].created_at; d.updated_at = now; allOrders[i] = d; }
-  } else { d.id = genId(); d.user_id = 'local'; d.created_at = now; d.updated_at = now; allOrders.unshift(d); }
+  } else { d.id = genId(); d.user_id = getCurrentUser(); d.created_at = now; d.updated_at = now; allOrders.unshift(d); }
   saveOrders();
   toast(editingOrderId ? '订单已更新' : '订单添加成功', 'success');
-  closeOrderModal(); renderOrderTable(allOrders); updateOrderCustomerFilter(); loadDashboard();
+  closeOrderModal(); renderOrderTable(getVisibleOrders()); updateOrderCustomerFilter(); loadDashboard();
 }
 
 // ================================================================
@@ -557,7 +605,7 @@ function loadMaterialRecords() {
 function saveMaterialRecords() { storageSet(STORAGE_KEY.MATERIAL_RECORDS, allMaterialRecords); cloudPush('material_records', allMaterialRecords); }
 
 function updateMaterialCustomerSelect() {
-  var cs = storageGet(STORAGE_KEY.CUSTOMERS) || [];
+  var cs = getVisibleCustomers();
   var opts = cs.map(function(c) { return '<option value="' + c.id + '">' + esc(c.name) + (c.company_name ? ' - ' + esc(c.company_name) : '') + '</option>'; }).join('');
   var sel = document.getElementById('material-customer-select');
   if (sel) {
@@ -586,7 +634,7 @@ function showProductList() {
   currentViewProductName = null;
 
   // 从订单中获取该客户的所有产品名（去重）
-  var orders = storageGet(STORAGE_KEY.ORDERS) || [];
+  var orders = getVisibleOrders();
   var customerOrders = orders.filter(function(o) { return o.customer_id === selectedMaterialCustomerId; });
   var productNames = [];
   customerOrders.forEach(function(o) {
@@ -603,7 +651,7 @@ function showProductList() {
 
   tb.innerHTML = productNames.map(function(pn) {
     // 统计该客户 + 该产品的包材出入库
-    var records = allMaterialRecords.filter(function(r) {
+    var records = getVisibleMaterialRecords().filter(function(r) {
       return r.customer_id === selectedMaterialCustomerId && r.product_name === pn;
     });
     var totalIn = records.filter(function(r) { return r.type === '入库'; }).reduce(function(s, r) { return s + r.quantity; }, 0);
@@ -630,7 +678,7 @@ function showProductRecords(productName) {
   document.getElementById('material-records-section').style.display = 'block';
   document.getElementById('material-records-product-name').textContent = productName;
 
-  var records = allMaterialRecords.filter(function(r) {
+  var records = getVisibleMaterialRecords().filter(function(r) {
     return r.customer_id === selectedMaterialCustomerId && r.product_name === productName;
   });
 
@@ -677,7 +725,7 @@ function saveMaterialRecord(e) {
   if (!qty || qty <= 0) { toast('请输入有效数量', 'error'); return; }
 
   if (type === 'out') {
-    var records = allMaterialRecords.filter(function(r) { return r.customer_id === customerId && r.product_name === productName; });
+    var records = getVisibleMaterialRecords().filter(function(r) { return r.customer_id === customerId && r.product_name === productName; });
     var tin = records.filter(function(r) { return r.type === '入库'; }).reduce(function(s, r) { return s + r.quantity; }, 0);
     var tout = records.filter(function(r) { return r.type === '出库'; }).reduce(function(s, r) { return s + r.quantity; }, 0);
     if (tin - tout < qty) { toast('剩余包材不足，当前剩余：' + (tin - tout), 'error'); return; }
@@ -690,6 +738,7 @@ function saveMaterialRecord(e) {
     type: type === 'in' ? '入库' : '出库',
     quantity: qty,
     notes: notes,
+    user_id: getCurrentUser(),
     created_at: new Date().toISOString(),
   });
   saveMaterialRecords();
@@ -721,20 +770,26 @@ function closeDeleteConfirm() {
 
 function confirmDelete() {
   if (deletingType === 'customer' && deletingCustomerId) {
+    var cust = allCustomers.find(function(c) { return c.id === deletingCustomerId; });
+    if (!isManager() && cust && cust.user_id !== getCurrentUser()) { toast('无权删除该客户', 'error'); closeDeleteConfirm(); return; }
     allOrders = allOrders.filter(function(o) { return o.customer_id !== deletingCustomerId; });
     allMaterialRecords = allMaterialRecords.filter(function(r) { return r.customer_id !== deletingCustomerId; });
     allCustomers = allCustomers.filter(function(c) { return c.id !== deletingCustomerId; });
     saveCustomers(); saveOrders(); saveMaterialRecords();
     toast('客户及其关联数据已删除', 'success');
   } else if (deletingType === 'order' && deletingOrderId) {
+    var ord = allOrders.find(function(o) { return o.id === deletingOrderId; });
+    if (!isManager() && ord && ord.user_id !== getCurrentUser()) { toast('无权删除该订单', 'error'); closeDeleteConfirm(); return; }
     allOrders = allOrders.filter(function(o) { return o.id !== deletingOrderId; });
     saveOrders(); toast('订单已删除', 'success');
   } else if (deletingType === 'material' && deletingMaterialId) {
+    var rec = allMaterialRecords.find(function(r) { return r.id === deletingMaterialId; });
+    if (!isManager() && rec && rec.user_id !== getCurrentUser()) { toast('无权删除该记录', 'error'); closeDeleteConfirm(); return; }
     allMaterialRecords = allMaterialRecords.filter(function(r) { return r.id !== deletingMaterialId; });
     saveMaterialRecords(); toast('包材记录已删除', 'success');
   }
   closeDeleteConfirm();
-  renderCustomerTable(allCustomers); renderOrderTable(allOrders);
+  renderCustomerTable(getVisibleCustomers()); renderOrderTable(getVisibleOrders());
   updateCustomerDropdowns(); updateOrderCustomerFilter(); updateMaterialCustomerSelect();
   if (selectedMaterialCustomerId) showProductList();
   if (currentViewProductName) showProductRecords(currentViewProductName);
@@ -749,18 +804,22 @@ function loadDashboard() {
   allOrders = storageGet(STORAGE_KEY.ORDERS) || [];
   allMaterialRecords = storageGet(STORAGE_KEY.MATERIAL_RECORDS) || [];
 
-  document.getElementById('stat-total-customers').textContent = allCustomers.length;
+  var vc = getVisibleCustomers();
+  var vo = getVisibleOrders();
+  var vr = getVisibleMaterialRecords();
+
+  document.getElementById('stat-total-customers').textContent = vc.length;
 
   var now = new Date();
   var firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  document.getElementById('stat-new-customers').textContent = allCustomers.filter(function(c) { return c.created_at >= firstDay; }).length;
+  document.getElementById('stat-new-customers').textContent = vc.filter(function(c) { return c.created_at >= firstDay; }).length;
 
   var active = ['沟通中', '打样中', '已报价', '已下单', '生产中', '已发货'];
-  document.getElementById('stat-active-orders').textContent = allOrders.filter(function(o) { return active.indexOf(o.status) !== -1; }).length;
+  document.getElementById('stat-active-orders').textContent = vo.filter(function(o) { return active.indexOf(o.status) !== -1; }).length;
 
   // 有剩余包材的产品数
   var allProducts = {};
-  allMaterialRecords.forEach(function(r) {
+  vr.forEach(function(r) {
     var key = r.customer_id + '|||' + r.product_name;
     if (!allProducts[key]) allProducts[key] = { tin: 0, tout: 0 };
     if (r.type === '入库') allProducts[key].tin += r.quantity;
@@ -819,7 +878,7 @@ function downloadCSV(rows, filename) {
 }
 
 function exportCustomers() {
-  var cs = storageGet(STORAGE_KEY.CUSTOMERS) || [];
+  var cs = getVisibleCustomers();
   var rows = [['客户姓名', '公司名称', '国家', '电话', '微信', '阿里来源', '等级', '状态', '首次联系', '最近联系', '备注', '创建时间']];
   cs.forEach(function(c) {
     rows.push([c.name, c.company_name, c.country, c.phone, c.wechat, c.source, c.customer_level, c.status, c.first_contact_date, c.last_contact_date, c.notes, fmtDateTime(c.created_at)]);
@@ -828,7 +887,7 @@ function exportCustomers() {
 }
 
 function exportOrders() {
-  var orders = storageGet(STORAGE_KEY.ORDERS) || [];
+  var orders = getVisibleOrders();
   var rows = [['客户', '产品名称', '尺寸', '商标要求', '报价(¥)', '数量', '交期', '是否含税', '是否含运费', '状态', '打样记录', '沟通备注', '创建时间']];
   orders.forEach(function(o) {
     rows.push([getCustName(o.customer_id), o.product_name, o.size, o.logo_requirements, o.quotation_price, o.order_quantity, o.delivery_date, o.tax_included, o.shipping_included, o.status, o.sample_record, o.communication_notes, fmtDateTime(o.created_at)]);
@@ -838,7 +897,7 @@ function exportOrders() {
 
 function exportMaterialRecords() {
   if (!selectedMaterialCustomerId || !currentViewProductName) { toast('请先选择客户并点击产品的"记录"', 'error'); return; }
-  var records = allMaterialRecords.filter(function(r) { return r.customer_id === selectedMaterialCustomerId && r.product_name === currentViewProductName; });
+  var records = getVisibleMaterialRecords().filter(function(r) { return r.customer_id === selectedMaterialCustomerId && r.product_name === currentViewProductName; });
   var rows = [['时间', '类型', '产品', '数量', '备注']];
   records.forEach(function(r) {
     rows.push([fmtDateTime(r.created_at), r.type, r.product_name, r.quantity, r.notes]);
@@ -929,8 +988,38 @@ function bindEvents() {
   });
 }
 
+// ========== 重置所有用户（通过 ?reset-users=1 触发） ==========
+async function resetAllUsers() {
+  storageSet(STORAGE_KEY.AUTH, { users: [] });
+  sessionStorage.removeItem(STORAGE_KEY.SESSION);
+  sessionStorage.removeItem('crm_logged_user');
+  sessionStorage.removeItem('crm_role');
+  if (cloudEnabled()) {
+    await cloudPush('users', { users: [] });
+  }
+  document.getElementById('auth-section').style.display = 'flex';
+  document.getElementById('app-section').style.display = 'none';
+  document.getElementById('login-form').style.display = 'none';
+  document.getElementById('register-form').style.display = 'none';
+  document.getElementById('forgot-password-form').style.display = 'none';
+  var err = document.getElementById('auth-error');
+  err.textContent = '所有用户已清除，请重新注册。';
+  err.style.display = 'block';
+  err.style.color = '#16a34a';
+  // 清除 URL 中的参数
+  if (window.history && window.history.replaceState) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+
 // ========== 启动 ==========
 document.addEventListener('DOMContentLoaded', async function() {
+  // 检查是否需要重置所有用户
+  if (window.location.search.indexOf('reset-users=1') !== -1) {
+    await resetAllUsers();
+    return;
+  }
+
   bindEvents();
   // 先从云端拉取最新数据
   var cloudUpdated = await cloudSyncOnLoad();
@@ -941,7 +1030,10 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   if (isLoggedIn()) {
     var loggedUser = sessionStorage.getItem('crm_logged_user');
-    if (loggedUser) { enterApp(loggedUser); return; }
+    if (loggedUser) {
+      if (!sessionStorage.getItem('crm_role')) { var u = findUser(loggedUser); sessionStorage.setItem('crm_role', u ? (u.role || '总经理') : '总经理'); }
+      enterApp(loggedUser); return;
+    }
   }
   document.getElementById('auth-section').style.display = 'flex';
   document.getElementById('app-section').style.display = 'none';
