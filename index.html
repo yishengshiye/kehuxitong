@@ -67,6 +67,13 @@
         </p>
       </form>
 
+      <div id="token-setup" style="display:none;text-align:center;padding:20px;background:#fffbe6;border-radius:8px;margin-bottom:16px;">
+        <p style="font-size:14px;color:#b45309;margin-bottom:6px;">未启用云同步 - 数据不会在多设备间同步</p>
+        <input type="password" id="setup-token" placeholder="粘贴 GitHub Token" style="width:100%;padding:8px;border:1px solid #fbbf24;border-radius:4px;font-size:13px;margin-top:8px;">
+        <button id="btn-save-token" class="btn btn-primary btn-sm" style="margin-top:8px;width:100%;">启用云同步</button>
+        <p id="token-setup-msg" style="font-size:12px;margin-top:6px;color:#888;"></p>
+      </div>
+
       <form id="forgot-password-form" style="display:none;">
         <h2>找回密码</h2>
         <div class="form-group">

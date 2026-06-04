@@ -35,6 +35,91 @@ async function hashPassword(password) {
 function storageGet(key) { try { var r = localStorage.getItem(key); return r ? JSON.parse(r) : null; } catch(e) { return null; } }
 function storageSet(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
+// ========== GitHub 云同步 ==========
+var GITHUB_API_BASE = 'https://api.github.com/repos/yishengshiye/kehuxitong/contents/data/';
+var cloudSHAs = {};
+var cloudEnabled = function() { return !!localStorage.getItem('crm_github_token'); };
+
+function _getToken() { return localStorage.getItem('crm_github_token') || ''; }
+
+function _b64ToUtf8(b64) {
+  var bin = atob(b64); var bytes = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function _utf8ToB64(str) {
+  var bytes = new TextEncoder().encode(str); var bin = '';
+  for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+// 从 GitHub 拉取数据，返回 { data, sha } 或 null
+async function cloudPull(fileName) {
+  try {
+    var resp = await fetch(GITHUB_API_BASE + fileName + '.json', {
+      headers: { 'Authorization': 'token ' + _getToken(), 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (resp.status === 404) return null;
+    if (!resp.ok) throw new Error('status ' + resp.status);
+    var j = await resp.json();
+    cloudSHAs[fileName] = j.sha;
+    return { data: JSON.parse(_b64ToUtf8(j.content)), sha: j.sha };
+  } catch(e) { console.warn('云端拉取失败(' + fileName + '):', e.message); return null; }
+}
+
+// 推数据到 GitHub
+async function cloudPush(fileName, data) {
+  if (!cloudEnabled()) return;
+  try {
+    var body = { message: '[auto] update ' + fileName, content: _utf8ToB64(JSON.stringify(data, null, 2)) };
+    if (cloudSHAs[fileName]) body.sha = cloudSHAs[fileName];
+    var resp = await fetch(GITHUB_API_BASE + fileName + '.json', {
+      method: 'PUT',
+      headers: { 'Authorization': 'token ' + _getToken(), 'Content-Type': 'application/json', 'Accept': 'application/vnd.github.v3+json' },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) {
+      if (resp.status === 409) { delete cloudSHAs[fileName]; } // 冲突了，下次重拉
+      throw new Error('status ' + resp.status);
+    }
+    var j = await resp.json();
+    cloudSHAs[fileName] = j.content.sha;
+  } catch(e) { console.warn('云端推送失败(' + fileName + '):', e.message); }
+}
+
+// 首次加载：从云端拉全部数据
+async function cloudSyncOnLoad() {
+  if (!cloudEnabled()) return false;
+  try {
+    var files = ['users', 'customers', 'orders', 'material_records'];
+    var updated = false;
+    for (var i = 0; i < files.length; i++) {
+      var result = await cloudPull(files[i]);
+      if (result && result.data) {
+        if (files[i] === 'users') {
+          storageSet(STORAGE_KEY.AUTH, result.data);
+        } else if (files[i] === 'customers') {
+          storageSet(STORAGE_KEY.CUSTOMERS, result.data);
+        } else if (files[i] === 'orders') {
+          storageSet(STORAGE_KEY.ORDERS, result.data);
+        } else if (files[i] === 'material_records') {
+          storageSet(STORAGE_KEY.MATERIAL_RECORDS, result.data);
+        }
+        updated = true;
+      } else {
+        // 云端没数据，把本地的推上去
+        var localKey = files[i] === 'users' ? STORAGE_KEY.AUTH :
+                       files[i] === 'customers' ? STORAGE_KEY.CUSTOMERS :
+                       files[i] === 'orders' ? STORAGE_KEY.ORDERS : STORAGE_KEY.MATERIAL_RECORDS;
+        var localData = storageGet(localKey);
+        if (localData) { await cloudPush(files[i], localData); }
+      }
+    }
+    return updated;
+  } catch(e) { console.warn('云端同步失败:', e.message); return false; }
+}
+
 // ========== 认证 ==========
 function getUsers() {
   var auth = storageGet(STORAGE_KEY.AUTH);
@@ -48,7 +133,7 @@ function getUsers() {
   return auth.users || [];
 }
 
-function saveUsers(users) { storageSet(STORAGE_KEY.AUTH, { users: users }); }
+function saveUsers(users) { var d = { users: users }; storageSet(STORAGE_KEY.AUTH, d); cloudPush('users', d); }
 
 function findUser(username) {
   var users = getUsers();
@@ -73,6 +158,9 @@ function showAuthForms() {
     document.getElementById('login-form').style.display = 'none';
     document.getElementById('register-form').style.display = 'block';
   }
+  // 云同步配置提示
+  document.getElementById('token-setup').style.display = cloudEnabled() ? 'none' : 'block';
+  document.getElementById('token-setup-msg').textContent = '';
 }
 
 function showRegisterForm() {
@@ -231,7 +319,7 @@ function switchView(viewName) {
 //                      客 户
 // ================================================================
 function loadCustomers() { allCustomers = storageGet(STORAGE_KEY.CUSTOMERS) || []; renderCustomerTable(allCustomers); updateCustomerDropdowns(); }
-function saveCustomers() { storageSet(STORAGE_KEY.CUSTOMERS, allCustomers); }
+function saveCustomers() { storageSet(STORAGE_KEY.CUSTOMERS, allCustomers); cloudPush('customers', allCustomers); }
 
 function renderCustomerTable(customers) {
   var tb = document.getElementById('customer-table-body');
@@ -317,7 +405,7 @@ function saveCustomer(e) {
 //                      订 单
 // ================================================================
 function loadOrders() { allOrders = storageGet(STORAGE_KEY.ORDERS) || []; renderOrderTable(allOrders); updateOrderCustomerFilter(); }
-function saveOrders() { storageSet(STORAGE_KEY.ORDERS, allOrders); }
+function saveOrders() { storageSet(STORAGE_KEY.ORDERS, allOrders); cloudPush('orders', allOrders); }
 
 function updateCustomerDropdowns() {
   var cs = storageGet(STORAGE_KEY.CUSTOMERS) || [];
@@ -423,7 +511,7 @@ function loadMaterialRecords() {
   updateMaterialCustomerSelect();
 }
 
-function saveMaterialRecords() { storageSet(STORAGE_KEY.MATERIAL_RECORDS, allMaterialRecords); }
+function saveMaterialRecords() { storageSet(STORAGE_KEY.MATERIAL_RECORDS, allMaterialRecords); cloudPush('material_records', allMaterialRecords); }
 
 function updateMaterialCustomerSelect() {
   var cs = storageGet(STORAGE_KEY.CUSTOMERS) || [];
@@ -727,6 +815,16 @@ function bindEvents() {
   document.getElementById('show-login-from-forgot').addEventListener('click', function(e) { e.preventDefault(); showLoginForm(); });
   document.getElementById('btn-forgot-check').addEventListener('click', handleForgotCheck);
   document.getElementById('btn-forgot-reset').addEventListener('click', handleForgotReset);
+  document.getElementById('btn-save-token').addEventListener('click', function() {
+    var token = document.getElementById('setup-token').value.trim();
+    var msg = document.getElementById('token-setup-msg');
+    if (!token) { msg.textContent = '请输入 Token'; return; }
+    if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) { msg.textContent = 'Token 格式不正确，应以 ghp_ 或 github_pat_ 开头'; return; }
+    localStorage.setItem('crm_github_token', token);
+    msg.textContent = '已保存！云同步已启用。';
+    msg.style.color = '#16a34a';
+    setTimeout(function() { document.getElementById('token-setup').style.display = 'none'; }, 1000);
+  });
   document.getElementById('btn-logout').addEventListener('click', handleLogout);
 
   document.querySelectorAll('.nav-item[data-view]').forEach(function(item) {
@@ -785,8 +883,15 @@ function bindEvents() {
 }
 
 // ========== 启动 ==========
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   bindEvents();
+  // 先从云端拉取最新数据
+  var cloudUpdated = await cloudSyncOnLoad();
+  if (cloudUpdated) {
+    // 云端有新数据，刷新内存
+    var auth = storageGet(STORAGE_KEY.AUTH);
+    if (auth) { /* 用户数据已更新 */ }
+  }
   if (isLoggedIn()) {
     var loggedUser = sessionStorage.getItem('crm_logged_user');
     if (loggedUser) { enterApp(loggedUser); return; }
