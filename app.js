@@ -33,7 +33,7 @@ async function hashPassword(password) {
 
 // ========== 权限 ==========
 function getCurrentUser() { return sessionStorage.getItem('crm_logged_user') || ''; }
-function getCurrentRole() { return sessionStorage.getItem('crm_role') || '总经理'; }
+function getCurrentRole() { return sessionStorage.getItem('crm_role') || '业务员'; }
 function isManager() { return getCurrentRole() === '总经理'; }
 
 function getVisibleCustomers() {
@@ -314,7 +314,14 @@ async function handleLogin(e) {
   if (inputHash !== user.passwordHash) { err.textContent = '密码错误，请重试'; err.style.display = 'block'; return; }
   sessionStorage.setItem(STORAGE_KEY.SESSION, '1');
   sessionStorage.setItem('crm_logged_user', user.name || username);
-  sessionStorage.setItem('crm_role', user.role || '总经理');
+  // 有明确角色的直接用；没有的看是不是第一个注册的用户
+  var role = user.role;
+  if (!role) {
+    var allUsers = getUsers();
+    var firstUser = allUsers.length > 0 ? allUsers[0].username : '';
+    role = (user.username === firstUser) ? '总经理' : '业务员';
+  }
+  sessionStorage.setItem('crm_role', role);
   enterApp(user.name || username);
 }
 
@@ -1033,7 +1040,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   if (isLoggedIn()) {
     var loggedUser = sessionStorage.getItem('crm_logged_user');
     if (loggedUser) {
-      if (!sessionStorage.getItem('crm_role')) { var u = findUser(loggedUser); sessionStorage.setItem('crm_role', u ? (u.role || '总经理') : '总经理'); }
+      if (!sessionStorage.getItem('crm_role')) { var u = findUser(loggedUser); if (u) { var allU = getUsers(); var firstU = allU.length > 0 ? allU[0].username : ''; sessionStorage.setItem('crm_role', u.role || ((u.username === firstU) ? '总经理' : '业务员')); } }
       enterApp(loggedUser); return;
     }
   }
