@@ -957,10 +957,24 @@ function bindEvents() {
   document.getElementById('btn-logout').addEventListener('click', handleLogout);
 
   document.querySelectorAll('.nav-item[data-view]').forEach(function(item) {
-    item.addEventListener('click', function(e) {
+    item.addEventListener('click', async function(e) {
       e.preventDefault();
       var v = item.dataset.view;
       switchView(v);
+      // 切换页面时先从云端拉取最新数据
+      if (cloudEnabled()) {
+        var files = ['customers', 'orders', 'material_records'];
+        for (var i = 0; i < files.length; i++) {
+          var cr = await cloudPull(files[i]);
+          if (cr && cr.data) {
+            var key = files[i] === 'customers' ? STORAGE_KEY.CUSTOMERS :
+                       files[i] === 'orders' ? STORAGE_KEY.ORDERS : STORAGE_KEY.MATERIAL_RECORDS;
+            var localData = storageGet(key);
+            var merged = _mergeData(files[i], cr.data, localData);
+            storageSet(key, merged || cr.data);
+          }
+        }
+      }
       if (v === 'dashboard') loadDashboard();
       if (v === 'customers') loadCustomers();
       if (v === 'orders') { loadOrders(); updateCustomerDropdowns(); }
