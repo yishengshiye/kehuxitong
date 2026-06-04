@@ -26,6 +26,15 @@
       "securityAnswer": "7c29542ba7478ef5086f7107f1c11620a201e3ac3d23648977a289d9de73e7b1",
       "role": "业务员",
       "createdAt": "2026-06-04T09:10:39.157Z"
+    },
+    {
+      "username": "小宝",
+      "name": "小宝",
+      "passwordHash": "a286316f58846d430072c50d6746d9372980f453a935fa0ed9527cd929ef6aa9",
+      "securityQuestion": "你的生日是几月几日？",
+      "securityAnswer": "a286316f58846d430072c50d6746d9372980f453a935fa0ed9527cd929ef6aa9",
+      "role": "总经理",
+      "createdAt": "2026-06-04T09:17:15.268Z"
     }
   ]
 }
