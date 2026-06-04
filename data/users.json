@@ -1,0 +1,12 @@
+{
+  "users": [
+    {
+      "username": "田一丁",
+      "name": "田一丁",
+      "passwordHash": "61fa22b8fc647c554d97e7320d8517d64646f3c63eb85841cbdb539f18c9e832",
+      "securityQuestion": "",
+      "securityAnswer": "",
+      "createdAt": "2026-06-04T06:43:51.575Z"
+    }
+  ]
+}
