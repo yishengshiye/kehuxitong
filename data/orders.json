@@ -1,5 +1,23 @@
 [
   {
+    "customer_id": "mpza5lyw_59ueet",
+    "product_name": "膏药贴",
+    "size": "10贴一盒",
+    "logo_requirements": "",
+    "quotation_price": "0.95",
+    "order_quantity": "500",
+    "delivery_date": null,
+    "status": "已完成",
+    "tax_included": "不含税",
+    "shipping_included": "不含运费",
+    "sample_record": "",
+    "communication_notes": "",
+    "id": "mpza7gu8_81lmh3",
+    "user_id": "李潮汕1",
+    "created_at": "2026-06-04T09:17:09.248Z",
+    "updated_at": "2026-06-04T09:17:09.248Z"
+  },
+  {
     "customer_id": "mpza675d_o8mo2q",
     "product_name": "主图眼药水",
     "size": "",
