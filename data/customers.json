@@ -1,1 +1,19 @@
-[]
+[
+  {
+    "name": "645365465",
+    "company_name": "",
+    "country": "",
+    "phone": "",
+    "wechat": "",
+    "source": "",
+    "customer_level": "潜在",
+    "status": "潜在客户",
+    "first_contact_date": null,
+    "last_contact_date": null,
+    "notes": "",
+    "id": "mpzc4uat_qtkchi",
+    "user_id": "小宝",
+    "created_at": "2026-06-04T10:11:05.957Z",
+    "updated_at": "2026-06-04T10:11:05.957Z"
+  }
+]
