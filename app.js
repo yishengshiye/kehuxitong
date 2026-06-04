@@ -480,14 +480,38 @@ function switchView(viewName) {
 // ================================================================
 //                      客 户
 // ================================================================
-function loadCustomers() { allCustomers = storageGet(STORAGE_KEY.CUSTOMERS) || []; renderCustomerTable(getVisibleCustomers()); updateCustomerDropdowns(); }
+function loadCustomers() { allCustomers = storageGet(STORAGE_KEY.CUSTOMERS) || []; updateCustomerUserFilter(); renderCustomerTable(getVisibleCustomers()); updateCustomerDropdowns(); }
 function saveCustomers() { storageSet(STORAGE_KEY.CUSTOMERS, allCustomers); cloudPush('customers', allCustomers); }
+
+function updateCustomerUserFilter() {
+  var sel = document.getElementById('customer-user-filter');
+  if (!sel) return;
+  if (isManager()) {
+    sel.style.display = 'inline-block';
+    var users = getUsers();
+    var opts = '<option value="">全部业务员</option>';
+    for (var i = 0; i < users.length; i++) {
+      opts += '<option value="' + esc(users[i].username) + '">' + esc(users[i].username) + (users[i].role === '总经理' ? ' (总经理)' : '') + '</option>';
+    }
+    sel.innerHTML = opts;
+    // 更新表头
+    var thead = document.querySelector('#customer-table thead tr');
+    if (thead) thead.innerHTML = '<th>客户姓名</th><th>公司名称</th><th>国家</th><th>电话</th><th>等级</th><th>状态</th><th>创建人</th><th>最近联系</th><th>操作</th>';
+  } else {
+    sel.style.display = 'none';
+    var thead2 = document.querySelector('#customer-table thead tr');
+    if (thead2) thead2.innerHTML = '<th>客户姓名</th><th>公司名称</th><th>国家</th><th>电话</th><th>等级</th><th>状态</th><th>最近联系</th><th>操作</th>';
+  }
+}
 
 function renderCustomerTable(customers) {
   var tb = document.getElementById('customer-table-body');
-  if (!customers || !customers.length) { tb.innerHTML = '<tr><td colspan="8" class="empty-state">暂无客户数据</td></tr>'; return; }
+  var showUser = isManager();
+  var colSpan = showUser ? 9 : 8;
+  if (!customers || !customers.length) { tb.innerHTML = '<tr><td colspan="' + colSpan + '" class="empty-state">暂无客户数据</td></tr>'; return; }
   tb.innerHTML = customers.map(function(c) {
     var lc = c.last_contact_date || c.updated_at || '';
+    var userCell = showUser ? '<td>' + esc(c.user_id || '-') + '</td>' : '';
     return '<tr>' +
       '<td><strong>' + esc(c.name || '') + '</strong></td>' +
       '<td>' + esc(c.company_name || '-') + '</td>' +
@@ -495,6 +519,7 @@ function renderCustomerTable(customers) {
       '<td>' + esc(c.phone || '-') + '</td>' +
       '<td><span class="badge ' + levelBadge(c.customer_level) + '">' + esc(c.customer_level || '-') + '</span></td>' +
       '<td><span class="badge ' + statusBadge(c.status) + '">' + esc(c.status || '-') + '</span></td>' +
+      userCell +
       '<td>' + fmtDate(lc) + '</td>' +
       '<td><div class="action-btns"><button class="btn btn-sm" onclick="openEditCustomerModal(\'' + c.id + '\')">编辑</button> <button class="btn btn-sm btn-danger" onclick="openDeleteConfirm(\'customer\',\'' + c.id + '\',\'' + esc(c.name || '') + '\')">删除</button></div></td></tr>';
   }).join('');
@@ -504,10 +529,12 @@ function filterCustomers() {
   var s = document.getElementById('customer-search').value.toLowerCase().trim();
   var sf = document.getElementById('customer-status-filter').value;
   var lf = document.getElementById('customer-level-filter').value;
+  var uf = document.getElementById('customer-user-filter').value;
   var f = getVisibleCustomers();
   if (s) f = f.filter(function(c) { return (c.name && c.name.toLowerCase().indexOf(s) !== -1) || (c.company_name && c.company_name.toLowerCase().indexOf(s) !== -1) || (c.country && c.country.toLowerCase().indexOf(s) !== -1) || (c.phone && c.phone.toLowerCase().indexOf(s) !== -1); });
   if (sf) f = f.filter(function(c) { return c.status === sf; });
   if (lf) f = f.filter(function(c) { return c.customer_level === lf; });
+  if (uf) f = f.filter(function(c) { return c.user_id === uf; });
   renderCustomerTable(f);
 }
 
@@ -560,7 +587,7 @@ function saveCustomer(e) {
   } else { d.id = genId(); d.user_id = getCurrentUser(); d.created_at = now; d.updated_at = now; allCustomers.unshift(d); }
   saveCustomers();
   toast(editingCustomerId ? '客户信息已更新' : '客户添加成功', 'success');
-  closeCustomerModal(); renderCustomerTable(getVisibleCustomers()); updateCustomerDropdowns(); loadDashboard();
+  closeCustomerModal(); updateCustomerUserFilter(); renderCustomerTable(getVisibleCustomers()); updateCustomerDropdowns(); loadDashboard();
 }
 
 // ================================================================
@@ -863,7 +890,7 @@ async function confirmDelete() {
     saveMaterialRecords(); toast('包材记录已删除', 'success');
   }
   closeDeleteConfirm();
-  renderCustomerTable(getVisibleCustomers()); renderOrderTable(getVisibleOrders());
+  updateCustomerUserFilter(); renderCustomerTable(getVisibleCustomers()); renderOrderTable(getVisibleOrders());
   updateCustomerDropdowns(); updateOrderCustomerFilter(); updateMaterialCustomerSelect();
   if (selectedMaterialCustomerId) showProductList();
   if (currentViewProductName) showProductRecords(currentViewProductName);
@@ -1043,6 +1070,7 @@ function bindEvents() {
   document.getElementById('customer-search').addEventListener('input', filterCustomers);
   document.getElementById('customer-status-filter').addEventListener('change', filterCustomers);
   document.getElementById('customer-level-filter').addEventListener('change', filterCustomers);
+  document.getElementById('customer-user-filter').addEventListener('change', filterCustomers);
 
   // 订单
   document.getElementById('btn-add-order').addEventListener('click', openAddOrderModal);
