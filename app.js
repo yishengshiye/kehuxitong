@@ -279,14 +279,25 @@ async function handleRegister(e) {
   var answer = document.getElementById('register-security-answer').value.trim();
   var err = document.getElementById('register-error');
   if (!username || username.length < 2) { err.textContent = '账号至少需要2位'; err.style.display = 'block'; return; }
-  if (findUser(username)) { err.textContent = '该账号已存在，请换一个账号名'; err.style.display = 'block'; return; }
   if (!pw || pw.length < 4) { err.textContent = '密码至少需要4位'; err.style.display = 'block'; return; }
   if (!question) { err.textContent = '请选择安全问题'; err.style.display = 'block'; return; }
   if (!answer) { err.textContent = '请填写安全问题的答案'; err.style.display = 'block'; return; }
-  // 角色：首个用户自动总经理，后面注册的只能是业务员
+  err.style.display = 'none';
+
+  // 如果开启了云同步，先从云端拉最新用户列表，防止多台电脑同时注册冲突
+  if (cloudEnabled()) {
+    var cloudResult = await cloudPull('users');
+    if (cloudResult && cloudResult.data) {
+      storageSet(STORAGE_KEY.AUTH, cloudResult.data);
+    }
+  }
+
+  if (findUser(username)) { err.textContent = '该账号已存在，请换一个账号名'; err.style.display = 'block'; return; }
+
+  // 角色：从云端拉取后重新判断，谁是第一个
   var existing = getUsers();
   var role = existing.length === 0 ? '总经理' : '业务员';
-  err.style.display = 'none';
+
   var hash = await hashPassword(pw);
   var answerHash = await hashPassword(answer);
   var users = getUsers();
@@ -998,14 +1009,22 @@ function bindEvents() {
   });
 }
 
-// ========== 重置所有用户（通过 ?reset-users=1 触发） ==========
+// ========== 重置所有数据（通过 ?reset-users=1 触发） ==========
 async function resetAllUsers() {
+  // 清除所有本地数据
   storageSet(STORAGE_KEY.AUTH, { users: [] });
+  storageSet(STORAGE_KEY.CUSTOMERS, []);
+  storageSet(STORAGE_KEY.ORDERS, []);
+  storageSet(STORAGE_KEY.MATERIAL_RECORDS, []);
   sessionStorage.removeItem(STORAGE_KEY.SESSION);
   sessionStorage.removeItem('crm_logged_user');
   sessionStorage.removeItem('crm_role');
+  // 清除云端数据
   if (cloudEnabled()) {
     await cloudPush('users', { users: [] });
+    await cloudPush('customers', []);
+    await cloudPush('orders', []);
+    await cloudPush('material_records', []);
   }
   document.getElementById('auth-section').style.display = 'flex';
   document.getElementById('app-section').style.display = 'none';
@@ -1013,7 +1032,7 @@ async function resetAllUsers() {
   document.getElementById('register-form').style.display = 'none';
   document.getElementById('forgot-password-form').style.display = 'none';
   var err = document.getElementById('auth-error');
-  err.textContent = '所有用户已清除，请重新注册。';
+  err.textContent = '所有数据已清除，请重新注册。';
   err.style.display = 'block';
   err.style.color = '#16a34a';
   // 清除 URL 中的参数
