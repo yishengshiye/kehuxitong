@@ -130,6 +130,10 @@ async function cloudSyncOnLoad() {
     var files = ['users', 'customers', 'orders', 'material_records'];
     var updated = false;
     for (var i = 0; i < files.length; i++) {
+      // 先拉取该类型的已删除 ID 列表
+      if (files[i] !== 'users') {
+        await _pullDeletedIds(files[i]);
+      }
       var cloudResult = await cloudPull(files[i]);
       var localKey = files[i] === 'users' ? STORAGE_KEY.AUTH :
                      files[i] === 'customers' ? STORAGE_KEY.CUSTOMERS :
@@ -167,23 +171,67 @@ function _mergeData(fileName, cloudData, localData) {
     }
     return merged ? { users: cloudUsers } : null;
   }
-  // 对于 customers、orders、material_records，用 id 去重并合并
+  // 对于 customers、orders、material_records
+  // 云端为准，不再把本地多余数据合并回云端（防止已删除的数据被复活）
   if (Array.isArray(cloudData) && Array.isArray(localData)) {
-    // 如果云端已清空（管理员重置），不再合并本地数据
     if (cloudData.length === 0) return [];
+    // 本地有新数据（云端没有的）才合并到云端
     var cloudIds = {};
     cloudData.forEach(function(item) { if (item.id) cloudIds[item.id] = true; });
     var hasNew = false;
+    var deletedIds = _getDeletedIds(fileName);
     for (var j = 0; j < localData.length; j++) {
-      if (localData[j].id && !cloudIds[localData[j].id]) {
+      var lid = localData[j].id;
+      if (lid && !cloudIds[lid] && deletedIds.indexOf(lid) === -1) {
         cloudData.push(localData[j]);
-        cloudIds[localData[j].id] = true;
+        cloudIds[lid] = true;
         hasNew = true;
       }
     }
     return hasNew ? cloudData : null;
   }
   return null;
+}
+
+// 已删除 ID 列表（防止同步时复活）
+function _getDeletedIds(fileName) {
+  var key = fileName === 'customers' ? 'crm_customers_deleted' :
+            fileName === 'orders' ? 'crm_orders_deleted' : 'crm_material_records_deleted';
+  return storageGet(key) || [];
+}
+
+function _addDeletedId(fileName, id) {
+  var key = fileName === 'customers' ? 'crm_customers_deleted' :
+            fileName === 'orders' ? 'crm_orders_deleted' : 'crm_material_records_deleted';
+  var ids = storageGet(key) || [];
+  if (ids.indexOf(id) === -1) {
+    ids.push(id);
+    storageSet(key, ids);
+    _syncDeletedIds(fileName, ids);
+  }
+}
+
+async function _syncDeletedIds(fileName, ids) {
+  if (!cloudEnabled()) return;
+  await cloudPush(fileName + '_deleted', ids);
+}
+
+async function _pullDeletedIds(fileName) {
+  if (!cloudEnabled()) return;
+  var key = fileName === 'customers' ? 'crm_customers_deleted' :
+            fileName === 'orders' ? 'crm_orders_deleted' : 'crm_material_records_deleted';
+  var cr = await cloudPull(fileName + '_deleted');
+  if (cr && cr.data) {
+    var localIds = storageGet(key) || [];
+    var merged = [];
+    cr.data.forEach(function(id) { if (merged.indexOf(id) === -1) merged.push(id); });
+    localIds.forEach(function(id) { if (merged.indexOf(id) === -1) merged.push(id); });
+    storageSet(key, merged);
+    if (merged.length !== (cr.data || []).length) {
+      await cloudPush(fileName + '_deleted', merged);
+    }
+  }
+}
 }
 
 // ========== 认证 ==========
@@ -791,10 +839,11 @@ function closeDeleteConfirm() {
   deletingCustomerId = null; deletingOrderId = null; deletingMaterialId = null;
 }
 
-function confirmDelete() {
+async function confirmDelete() {
   if (deletingType === 'customer' && deletingCustomerId) {
     var cust = allCustomers.find(function(c) { return c.id === deletingCustomerId; });
     if (!isManager() && cust && cust.user_id !== getCurrentUser()) { toast('无权删除该客户', 'error'); closeDeleteConfirm(); return; }
+    _addDeletedId('customers', deletingCustomerId);
     allOrders = allOrders.filter(function(o) { return o.customer_id !== deletingCustomerId; });
     allMaterialRecords = allMaterialRecords.filter(function(r) { return r.customer_id !== deletingCustomerId; });
     allCustomers = allCustomers.filter(function(c) { return c.id !== deletingCustomerId; });
@@ -803,11 +852,13 @@ function confirmDelete() {
   } else if (deletingType === 'order' && deletingOrderId) {
     var ord = allOrders.find(function(o) { return o.id === deletingOrderId; });
     if (!isManager() && ord && ord.user_id !== getCurrentUser()) { toast('无权删除该订单', 'error'); closeDeleteConfirm(); return; }
+    _addDeletedId('orders', deletingOrderId);
     allOrders = allOrders.filter(function(o) { return o.id !== deletingOrderId; });
     saveOrders(); toast('订单已删除', 'success');
   } else if (deletingType === 'material' && deletingMaterialId) {
     var rec = allMaterialRecords.find(function(r) { return r.id === deletingMaterialId; });
     if (!isManager() && rec && rec.user_id !== getCurrentUser()) { toast('无权删除该记录', 'error'); closeDeleteConfirm(); return; }
+    _addDeletedId('material_records', deletingMaterialId);
     allMaterialRecords = allMaterialRecords.filter(function(r) { return r.id !== deletingMaterialId; });
     saveMaterialRecords(); toast('包材记录已删除', 'success');
   }
@@ -965,6 +1016,7 @@ function bindEvents() {
       if (cloudEnabled()) {
         var files = ['customers', 'orders', 'material_records'];
         for (var i = 0; i < files.length; i++) {
+          await _pullDeletedIds(files[i]);
           var cr = await cloudPull(files[i]);
           if (cr && cr.data) {
             var key = files[i] === 'customers' ? STORAGE_KEY.CUSTOMERS :
