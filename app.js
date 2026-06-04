@@ -225,8 +225,9 @@ function showAuthForms() {
     document.getElementById('register-role').value = '总经理';
     document.getElementById('register-role-group').style.display = 'none';
   } else {
-    document.getElementById('register-role-group').style.display = 'block';
-    document.getElementById('register-role').value = '';
+    // 已有用户时，新注册只能是业务员，隐藏角色选择
+    document.getElementById('register-role-group').style.display = 'none';
+    document.getElementById('register-role').value = '业务员';
   }
   // 云同步配置提示
   document.getElementById('token-setup').style.display = cloudEnabled() ? 'none' : 'block';
@@ -243,8 +244,9 @@ function showRegisterForm() {
     document.getElementById('register-role').value = '总经理';
     document.getElementById('register-role-group').style.display = 'none';
   } else {
-    document.getElementById('register-role-group').style.display = 'block';
-    document.getElementById('register-role').value = '';
+    // 已有用户时，新注册只能是业务员
+    document.getElementById('register-role-group').style.display = 'none';
+    document.getElementById('register-role').value = '业务员';
   }
 }
 
@@ -281,10 +283,9 @@ async function handleRegister(e) {
   if (!pw || pw.length < 4) { err.textContent = '密码至少需要4位'; err.style.display = 'block'; return; }
   if (!question) { err.textContent = '请选择安全问题'; err.style.display = 'block'; return; }
   if (!answer) { err.textContent = '请填写安全问题的答案'; err.style.display = 'block'; return; }
-  // 角色：首个用户自动总经理
+  // 角色：首个用户自动总经理，后面注册的只能是业务员
   var existing = getUsers();
-  var role = existing.length === 0 ? '总经理' : document.getElementById('register-role').value;
-  if (!role) { err.textContent = '请选择角色'; err.style.display = 'block'; return; }
+  var role = existing.length === 0 ? '总经理' : '业务员';
   err.style.display = 'none';
   var hash = await hashPassword(pw);
   var answerHash = await hashPassword(answer);
