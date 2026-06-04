@@ -16,8 +16,8 @@
         <p>阿里巴巴商家专用</p>
       </div>
 
-      <form id="register-form">
-        <h2>首次使用 · 创建账号</h2>
+      <form id="register-form" style="display:none;">
+        <h2>注册新账号</h2>
         <div class="form-group">
           <label>设置账号 <span class="required">*</span></label>
           <input type="text" id="register-username" placeholder="请输入账号名（至少2位）" required minlength="2">
@@ -26,11 +26,29 @@
           <label>设置密码 <span class="required">*</span></label>
           <input type="password" id="register-password" placeholder="请设置密码（至少4位）" required minlength="4">
         </div>
+        <div class="form-group">
+          <label>安全问题 <span class="required">*</span></label>
+          <select id="register-security-question" required>
+            <option value="">请选择安全问题</option>
+            <option value="你的生日是几月几日？">你的生日是几月几日？</option>
+            <option value="你母亲的名字是什么？">你母亲的名字是什么？</option>
+            <option value="你父亲的名字是什么？">你父亲的名字是什么？</option>
+            <option value="你的出生地是哪里？">你的出生地是哪里？</option>
+            <option value="你最喜欢的食物是什么？">你最喜欢的食物是什么？</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>答案 <span class="required">*</span></label>
+          <input type="text" id="register-security-answer" placeholder="请记住此答案，用于找回密码" required>
+        </div>
         <div id="register-error" class="error-msg" style="display:none;"></div>
         <button type="submit" class="btn btn-primary btn-full">创建账号</button>
+        <p class="auth-switch">
+          <a href="#" id="show-login-from-register">← 返回登录</a>
+        </p>
       </form>
 
-      <form id="login-form" style="display:none;">
+      <form id="login-form">
         <h2>登录</h2>
         <div class="form-group">
           <label>账号</label>
@@ -43,7 +61,38 @@
         <div id="auth-error" class="error-msg" style="display:none;"></div>
         <button type="submit" class="btn btn-primary btn-full">登 录</button>
         <p class="auth-switch">
-          <a href="#" id="show-register">重置系统（清除所有数据）</a>
+          <a href="#" id="show-register">注册新账号</a>
+          <span style="color:#ccc;margin:0 8px;">|</span>
+          <a href="#" id="show-forgot-password">忘记密码</a>
+        </p>
+      </form>
+
+      <form id="forgot-password-form" style="display:none;">
+        <h2>找回密码</h2>
+        <div class="form-group">
+          <label>请输入你的账号</label>
+          <input type="text" id="forgot-username" placeholder="请输入账号" required>
+        </div>
+        <div id="forgot-question-section" style="display:none;">
+          <div class="form-group">
+            <label>安全问题</label>
+            <p id="forgot-question-text" style="background:#f0f4ff;padding:10px;border-radius:6px;color:#333;font-weight:bold;"></p>
+          </div>
+          <div class="form-group">
+            <label>你的答案</label>
+            <input type="text" id="forgot-answer" placeholder="请输入你的答案">
+          </div>
+          <div class="form-group">
+            <label>设置新密码 <span class="required">*</span></label>
+            <input type="password" id="forgot-new-password" placeholder="请设置新密码（至少4位）" minlength="4">
+          </div>
+        </div>
+        <div id="forgot-error" class="error-msg" style="display:none;"></div>
+        <div id="forgot-success" class="success-msg" style="display:none;"></div>
+        <button type="button" id="btn-forgot-check" class="btn btn-primary btn-full">验证账号</button>
+        <button type="button" id="btn-forgot-reset" class="btn btn-primary btn-full" style="display:none;">重置密码</button>
+        <p class="auth-switch">
+          <a href="#" id="show-login-from-forgot">← 返回登录</a>
         </p>
       </form>
     </div>

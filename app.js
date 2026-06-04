@@ -36,38 +36,91 @@ function storageGet(key) { try { var r = localStorage.getItem(key); return r ? J
 function storageSet(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
 // ========== 认证 ==========
-function isRegistered() { var a = storageGet(STORAGE_KEY.AUTH); return a && a.passwordHash; }
+function getUsers() {
+  var auth = storageGet(STORAGE_KEY.AUTH);
+  if (!auth) return [];
+  // 兼容旧版单用户格式 → 多用户格式
+  if (auth.passwordHash && !auth.users) {
+    var migrated = { users: [{ username: auth.username || auth.name || '管理员', name: auth.name || auth.username || '管理员', passwordHash: auth.passwordHash, securityQuestion: '', securityAnswer: '', createdAt: auth.createdAt || '' }] };
+    storageSet(STORAGE_KEY.AUTH, migrated);
+    return migrated.users;
+  }
+  return auth.users || [];
+}
+
+function saveUsers(users) { storageSet(STORAGE_KEY.AUTH, { users: users }); }
+
+function findUser(username) {
+  var users = getUsers();
+  for (var i = 0; i < users.length; i++) { if (users[i].username === username) return users[i]; }
+  return null;
+}
+
+function isRegistered() { return getUsers().length > 0; }
 function isLoggedIn() { return sessionStorage.getItem(STORAGE_KEY.SESSION) === '1'; }
 
 function showAuthForms() {
-  var auth = storageGet(STORAGE_KEY.AUTH);
-  // 兼容旧版：如果没有 username 字段，需要迁移
-  if (auth && auth.passwordHash && !auth.username) {
-    // 旧数据迁移：把 name 当作 username
-    auth.username = auth.name || '管理员';
-    storageSet(STORAGE_KEY.AUTH, auth);
-  }
-  if (isRegistered()) {
-    document.getElementById('register-form').style.display = 'none';
-    document.getElementById('login-form').style.display = 'block';
-    document.getElementById('auth-error').style.display = 'none';
-  } else {
-    document.getElementById('register-form').style.display = 'block';
+  // 默认显示登录
+  document.getElementById('login-form').style.display = 'block';
+  document.getElementById('register-form').style.display = 'none';
+  document.getElementById('forgot-password-form').style.display = 'none';
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('register-error').style.display = 'none';
+  document.getElementById('forgot-error').style.display = 'none';
+  document.getElementById('forgot-success').style.display = 'none';
+  // 如果没有账号，也显示注册
+  if (!isRegistered()) {
     document.getElementById('login-form').style.display = 'none';
-    document.getElementById('register-error').style.display = 'none';
+    document.getElementById('register-form').style.display = 'block';
   }
+}
+
+function showRegisterForm() {
+  document.getElementById('login-form').style.display = 'none';
+  document.getElementById('register-form').style.display = 'block';
+  document.getElementById('forgot-password-form').style.display = 'none';
+  document.getElementById('register-error').style.display = 'none';
+}
+
+function showLoginForm() {
+  document.getElementById('login-form').style.display = 'block';
+  document.getElementById('register-form').style.display = 'none';
+  document.getElementById('forgot-password-form').style.display = 'none';
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+function showForgotForm() {
+  document.getElementById('login-form').style.display = 'none';
+  document.getElementById('register-form').style.display = 'none';
+  document.getElementById('forgot-password-form').style.display = 'block';
+  document.getElementById('forgot-error').style.display = 'none';
+  document.getElementById('forgot-success').style.display = 'none';
+  document.getElementById('forgot-question-section').style.display = 'none';
+  document.getElementById('btn-forgot-check').style.display = 'block';
+  document.getElementById('btn-forgot-reset').style.display = 'none';
+  document.getElementById('forgot-username').value = '';
+  document.getElementById('forgot-answer').value = '';
+  document.getElementById('forgot-new-password').value = '';
 }
 
 async function handleRegister(e) {
   e.preventDefault();
   var username = document.getElementById('register-username').value.trim();
   var pw = document.getElementById('register-password').value;
+  var question = document.getElementById('register-security-question').value;
+  var answer = document.getElementById('register-security-answer').value.trim();
   var err = document.getElementById('register-error');
   if (!username || username.length < 2) { err.textContent = '账号至少需要2位'; err.style.display = 'block'; return; }
+  if (findUser(username)) { err.textContent = '该账号已存在，请换一个账号名'; err.style.display = 'block'; return; }
   if (!pw || pw.length < 4) { err.textContent = '密码至少需要4位'; err.style.display = 'block'; return; }
+  if (!question) { err.textContent = '请选择安全问题'; err.style.display = 'block'; return; }
+  if (!answer) { err.textContent = '请填写安全问题的答案'; err.style.display = 'block'; return; }
   err.style.display = 'none';
   var hash = await hashPassword(pw);
-  storageSet(STORAGE_KEY.AUTH, { username: username, name: username, passwordHash: hash, createdAt: new Date().toISOString() });
+  var answerHash = await hashPassword(answer);
+  var users = getUsers();
+  users.push({ username: username, name: username, passwordHash: hash, securityQuestion: question, securityAnswer: answerHash, createdAt: new Date().toISOString() });
+  saveUsers(users);
   sessionStorage.setItem(STORAGE_KEY.SESSION, '1');
   enterApp(username);
 }
@@ -79,12 +132,65 @@ async function handleLogin(e) {
   var err = document.getElementById('auth-error');
   if (!username) { err.textContent = '请输入账号'; err.style.display = 'block'; return; }
   if (!pw) { err.textContent = '请输入密码'; err.style.display = 'block'; return; }
-  var auth = storageGet(STORAGE_KEY.AUTH);
-  if (username !== auth.username) { err.textContent = '账号不存在'; err.style.display = 'block'; return; }
+  var user = findUser(username);
+  if (!user) { err.textContent = '账号不存在，请检查账号名或联系管理员'; err.style.display = 'block'; return; }
   var inputHash = await hashPassword(pw);
-  if (inputHash !== auth.passwordHash) { err.textContent = '密码错误，请重试'; err.style.display = 'block'; return; }
+  if (inputHash !== user.passwordHash) { err.textContent = '密码错误，请重试'; err.style.display = 'block'; return; }
   sessionStorage.setItem(STORAGE_KEY.SESSION, '1');
-  enterApp(auth.name || username);
+  enterApp(user.name || username);
+}
+
+// ---- 忘记密码 ----
+var forgotTargetUser = null;
+
+async function handleForgotCheck() {
+  var username = document.getElementById('forgot-username').value.trim();
+  var err = document.getElementById('forgot-error');
+  var success = document.getElementById('forgot-success');
+  err.style.display = 'none'; success.style.display = 'none';
+  if (!username) { err.textContent = '请输入账号'; err.style.display = 'block'; return; }
+  var user = findUser(username);
+  if (!user) { err.textContent = '账号不存在'; err.style.display = 'block'; return; }
+  if (!user.securityQuestion) {
+    // 旧账号没有安全问题，直接允许重置
+    forgotTargetUser = user;
+    document.getElementById('forgot-question-section').style.display = 'none';
+    document.getElementById('btn-forgot-check').style.display = 'none';
+    document.getElementById('btn-forgot-reset').style.display = 'block';
+    success.textContent = '该账号未设置安全问题，可直接设置新密码';
+    success.style.display = 'block';
+    return;
+  }
+  forgotTargetUser = user;
+  document.getElementById('forgot-question-text').textContent = user.securityQuestion;
+  document.getElementById('forgot-question-section').style.display = 'block';
+  document.getElementById('btn-forgot-check').style.display = 'none';
+  document.getElementById('btn-forgot-reset').style.display = 'block';
+}
+
+async function handleForgotReset() {
+  var answer = document.getElementById('forgot-answer').value.trim();
+  var newPw = document.getElementById('forgot-new-password').value;
+  var err = document.getElementById('forgot-error');
+  var success = document.getElementById('forgot-success');
+  err.style.display = 'none'; success.style.display = 'none';
+  if (forgotTargetUser.securityQuestion) {
+    if (!answer) { err.textContent = '请输入安全问题的答案'; err.style.display = 'block'; return; }
+    var answerHash = await hashPassword(answer);
+    if (answerHash !== forgotTargetUser.securityAnswer) { err.textContent = '答案错误，请重试'; err.style.display = 'block'; return; }
+  }
+  if (!newPw || newPw.length < 4) { err.textContent = '新密码至少需要4位'; err.style.display = 'block'; return; }
+  var newHash = await hashPassword(newPw);
+  // 更新用户密码
+  var users = getUsers();
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].username === forgotTargetUser.username) { users[i].passwordHash = newHash; break; }
+  }
+  saveUsers(users);
+  forgotTargetUser = null;
+  success.textContent = '密码重置成功！请返回登录。';
+  success.style.display = 'block';
+  document.getElementById('btn-forgot-reset').style.display = 'none';
 }
 
 function handleLogout() {
@@ -98,13 +204,14 @@ function enterApp(userName) {
   document.getElementById('auth-section').style.display = 'none';
   document.getElementById('app-section').style.display = 'flex';
   document.getElementById('user-name').textContent = userName;
+  sessionStorage.setItem('crm_logged_user', userName);
   switchView('dashboard');
   loadDashboard();
   loadCustomers(); loadOrders(); loadMaterialRecords();
 }
 
 function resetSystem() {
-  if (!confirm('确定要重置系统吗？所有数据将被清除且无法恢复！')) return;
+  if (!confirm('确定要重置系统吗？所有数据（客户、订单、包材记录）将被清除且无法恢复！')) return;
   Object.keys(STORAGE_KEY).forEach(function(k) { localStorage.removeItem(STORAGE_KEY[k]); });
   sessionStorage.removeItem(STORAGE_KEY.SESSION);
   location.reload();
@@ -614,7 +721,12 @@ function exportMaterialRecords() {
 function bindEvents() {
   document.getElementById('register-form').addEventListener('submit', handleRegister);
   document.getElementById('login-form').addEventListener('submit', handleLogin);
-  document.getElementById('show-register').addEventListener('click', function(e) { e.preventDefault(); resetSystem(); });
+  document.getElementById('show-register').addEventListener('click', function(e) { e.preventDefault(); showRegisterForm(); });
+  document.getElementById('show-forgot-password').addEventListener('click', function(e) { e.preventDefault(); showForgotForm(); });
+  document.getElementById('show-login-from-register').addEventListener('click', function(e) { e.preventDefault(); showLoginForm(); });
+  document.getElementById('show-login-from-forgot').addEventListener('click', function(e) { e.preventDefault(); showLoginForm(); });
+  document.getElementById('btn-forgot-check').addEventListener('click', handleForgotCheck);
+  document.getElementById('btn-forgot-reset').addEventListener('click', handleForgotReset);
   document.getElementById('btn-logout').addEventListener('click', handleLogout);
 
   document.querySelectorAll('.nav-item[data-view]').forEach(function(item) {
@@ -675,7 +787,10 @@ function bindEvents() {
 // ========== 启动 ==========
 document.addEventListener('DOMContentLoaded', function() {
   bindEvents();
-  if (isLoggedIn()) { var auth = storageGet(STORAGE_KEY.AUTH); if (auth) { enterApp(auth.name || '管理员'); return; } }
+  if (isLoggedIn()) {
+    var loggedUser = sessionStorage.getItem('crm_logged_user');
+    if (loggedUser) { enterApp(loggedUser); return; }
+  }
   document.getElementById('auth-section').style.display = 'flex';
   document.getElementById('app-section').style.display = 'none';
   showAuthForms();
