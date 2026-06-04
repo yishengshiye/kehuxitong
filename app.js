@@ -158,6 +158,8 @@ function _mergeData(fileName, cloudData, localData) {
   if (fileName === 'users') {
     var cloudUsers = cloudData.users || [];
     var localUsers = localData.users || [];
+    // 如果云端已清空（管理员重置），则本地也清空，不再合并
+    if (cloudUsers.length === 0) return { users: [] };
     var merged = false;
     for (var i = 0; i < localUsers.length; i++) {
       var found = cloudUsers.some(function(u) { return u.username === localUsers[i].username; });
