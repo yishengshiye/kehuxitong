@@ -1,3 +1,13 @@
 {
-  "users": []
+  "users": [
+    {
+      "username": "田一丁",
+      "name": "田一丁",
+      "passwordHash": "61fa22b8fc647c554d97e7320d8517d64646f3c63eb85841cbdb539f18c9e832",
+      "securityQuestion": "你的生日是几月几日？",
+      "securityAnswer": "61fa22b8fc647c554d97e7320d8517d64646f3c63eb85841cbdb539f18c9e832",
+      "role": "总经理",
+      "createdAt": "2026-06-04T09:32:27.954Z"
+    }
+  ]
 }
