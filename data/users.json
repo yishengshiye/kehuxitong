@@ -17,6 +17,15 @@
       "securityAnswer": "0ed47d792fdd33361d91a78fc6f50bf308430b22b9dac8b842275bb48b8d15b0",
       "role": "业务员",
       "createdAt": "2026-06-04T09:08:57.373Z"
+    },
+    {
+      "username": "李潮汕1",
+      "name": "李潮汕1",
+      "passwordHash": "fadcf2ea909ca1a83722bc3c167cc3a9d7d8ef6829ec43d6215de8f89b7bc422",
+      "securityQuestion": "你的生日是几月几日？",
+      "securityAnswer": "7c29542ba7478ef5086f7107f1c11620a201e3ac3d23648977a289d9de73e7b1",
+      "role": "业务员",
+      "createdAt": "2026-06-04T09:10:39.157Z"
     }
   ]
 }
