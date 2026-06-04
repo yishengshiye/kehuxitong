@@ -8,6 +8,15 @@
       "securityAnswer": "61fa22b8fc647c554d97e7320d8517d64646f3c63eb85841cbdb539f18c9e832",
       "role": "总经理",
       "createdAt": "2026-06-04T09:28:59.203Z"
+    },
+    {
+      "username": "小宝",
+      "name": "小宝",
+      "passwordHash": "a286316f58846d430072c50d6746d9372980f453a935fa0ed9527cd929ef6aa9",
+      "securityQuestion": "你的生日是几月几日？",
+      "securityAnswer": "a286316f58846d430072c50d6746d9372980f453a935fa0ed9527cd929ef6aa9",
+      "role": "总经理",
+      "createdAt": "2026-06-04T09:24:20.874Z"
     }
   ]
 }
