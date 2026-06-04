@@ -1,40 +1,13 @@
 {
   "users": [
     {
-      "username": "田一丁",
-      "name": "田一丁",
-      "passwordHash": "61fa22b8fc647c554d97e7320d8517d64646f3c63eb85841cbdb539f18c9e832",
-      "securityQuestion": "你的生日是几月几日？",
-      "securityAnswer": "61fa22b8fc647c554d97e7320d8517d64646f3c63eb85841cbdb539f18c9e832",
-      "role": "总经理",
-      "createdAt": "2026-06-04T09:03:36.868Z"
-    },
-    {
-      "username": "李潮汕",
-      "name": "李潮汕",
-      "passwordHash": "4c7ef1d543ea2da82d4a74a7c33d7f0c943404fd9ba6a59b5348775df9f2bbe5",
-      "securityQuestion": "你的生日是几月几日？",
-      "securityAnswer": "0ed47d792fdd33361d91a78fc6f50bf308430b22b9dac8b842275bb48b8d15b0",
-      "role": "业务员",
-      "createdAt": "2026-06-04T09:08:57.373Z"
-    },
-    {
-      "username": "李潮汕1",
-      "name": "李潮汕1",
-      "passwordHash": "fadcf2ea909ca1a83722bc3c167cc3a9d7d8ef6829ec43d6215de8f89b7bc422",
-      "securityQuestion": "你的生日是几月几日？",
-      "securityAnswer": "7c29542ba7478ef5086f7107f1c11620a201e3ac3d23648977a289d9de73e7b1",
-      "role": "业务员",
-      "createdAt": "2026-06-04T09:10:39.157Z"
-    },
-    {
       "username": "小宝",
       "name": "小宝",
       "passwordHash": "a286316f58846d430072c50d6746d9372980f453a935fa0ed9527cd929ef6aa9",
       "securityQuestion": "你的生日是几月几日？",
       "securityAnswer": "a286316f58846d430072c50d6746d9372980f453a935fa0ed9527cd929ef6aa9",
       "role": "总经理",
-      "createdAt": "2026-06-04T09:17:15.268Z"
+      "createdAt": "2026-06-04T09:24:20.874Z"
     }
   ]
 }
