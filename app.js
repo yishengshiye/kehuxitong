@@ -40,6 +40,13 @@ function isRegistered() { var a = storageGet(STORAGE_KEY.AUTH); return a && a.pa
 function isLoggedIn() { return sessionStorage.getItem(STORAGE_KEY.SESSION) === '1'; }
 
 function showAuthForms() {
+  var auth = storageGet(STORAGE_KEY.AUTH);
+  // 兼容旧版：如果没有 username 字段，需要迁移
+  if (auth && auth.passwordHash && !auth.username) {
+    // 旧数据迁移：把 name 当作 username
+    auth.username = auth.name || '管理员';
+    storageSet(STORAGE_KEY.AUTH, auth);
+  }
   if (isRegistered()) {
     document.getElementById('register-form').style.display = 'none';
     document.getElementById('login-form').style.display = 'block';
@@ -53,27 +60,31 @@ function showAuthForms() {
 
 async function handleRegister(e) {
   e.preventDefault();
-  var name = document.getElementById('register-name').value.trim() || '管理员';
+  var username = document.getElementById('register-username').value.trim();
   var pw = document.getElementById('register-password').value;
   var err = document.getElementById('register-error');
+  if (!username || username.length < 2) { err.textContent = '账号至少需要2位'; err.style.display = 'block'; return; }
   if (!pw || pw.length < 4) { err.textContent = '密码至少需要4位'; err.style.display = 'block'; return; }
   err.style.display = 'none';
   var hash = await hashPassword(pw);
-  storageSet(STORAGE_KEY.AUTH, { name: name, passwordHash: hash, createdAt: new Date().toISOString() });
+  storageSet(STORAGE_KEY.AUTH, { username: username, name: username, passwordHash: hash, createdAt: new Date().toISOString() });
   sessionStorage.setItem(STORAGE_KEY.SESSION, '1');
-  enterApp(name);
+  enterApp(username);
 }
 
 async function handleLogin(e) {
   e.preventDefault();
+  var username = document.getElementById('login-username').value.trim();
   var pw = document.getElementById('login-password').value;
   var err = document.getElementById('auth-error');
+  if (!username) { err.textContent = '请输入账号'; err.style.display = 'block'; return; }
   if (!pw) { err.textContent = '请输入密码'; err.style.display = 'block'; return; }
   var auth = storageGet(STORAGE_KEY.AUTH);
+  if (username !== auth.username) { err.textContent = '账号不存在'; err.style.display = 'block'; return; }
   var inputHash = await hashPassword(pw);
   if (inputHash !== auth.passwordHash) { err.textContent = '密码错误，请重试'; err.style.display = 'block'; return; }
   sessionStorage.setItem(STORAGE_KEY.SESSION, '1');
-  enterApp(auth.name || '管理员');
+  enterApp(auth.name || username);
 }
 
 function handleLogout() {
