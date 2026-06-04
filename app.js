@@ -99,36 +99,63 @@ async function cloudPush(fileName, data, retryCount) {
   }
 }
 
-// 首次加载：从云端拉全部数据
+// 首次加载：从云端拉全部数据，并智能合并本地+云端
 async function cloudSyncOnLoad() {
   if (!cloudEnabled()) return false;
   try {
     var files = ['users', 'customers', 'orders', 'material_records'];
     var updated = false;
     for (var i = 0; i < files.length; i++) {
-      var result = await cloudPull(files[i]);
-      if (result && result.data) {
-        if (files[i] === 'users') {
-          storageSet(STORAGE_KEY.AUTH, result.data);
-        } else if (files[i] === 'customers') {
-          storageSet(STORAGE_KEY.CUSTOMERS, result.data);
-        } else if (files[i] === 'orders') {
-          storageSet(STORAGE_KEY.ORDERS, result.data);
-        } else if (files[i] === 'material_records') {
-          storageSet(STORAGE_KEY.MATERIAL_RECORDS, result.data);
+      var cloudResult = await cloudPull(files[i]);
+      var localKey = files[i] === 'users' ? STORAGE_KEY.AUTH :
+                     files[i] === 'customers' ? STORAGE_KEY.CUSTOMERS :
+                     files[i] === 'orders' ? STORAGE_KEY.ORDERS : STORAGE_KEY.MATERIAL_RECORDS;
+      var localData = storageGet(localKey);
+
+      if (cloudResult && cloudResult.data) {
+        // 云端有数据，检查本地是否有云端没有的（合并）
+        if (localData) {
+          var merged = _mergeData(files[i], cloudResult.data, localData);
+          if (merged) { cloudResult.data = merged; await cloudPush(files[i], merged); }
         }
+        storageSet(localKey, cloudResult.data);
         updated = true;
-      } else {
+      } else if (localData) {
         // 云端没数据，把本地的推上去
-        var localKey = files[i] === 'users' ? STORAGE_KEY.AUTH :
-                       files[i] === 'customers' ? STORAGE_KEY.CUSTOMERS :
-                       files[i] === 'orders' ? STORAGE_KEY.ORDERS : STORAGE_KEY.MATERIAL_RECORDS;
-        var localData = storageGet(localKey);
-        if (localData) { await cloudPush(files[i], localData); }
+        await cloudPush(files[i], localData);
       }
     }
     return updated;
   } catch(e) { console.warn('云端同步失败:', e.message); return false; }
+}
+
+// 合并云端和本地数据（本地有但云端没有的，补充到云端）
+function _mergeData(fileName, cloudData, localData) {
+  if (fileName === 'users') {
+    var cloudUsers = cloudData.users || [];
+    var localUsers = localData.users || [];
+    var merged = false;
+    for (var i = 0; i < localUsers.length; i++) {
+      var found = cloudUsers.some(function(u) { return u.username === localUsers[i].username; });
+      if (!found) { cloudUsers.push(localUsers[i]); merged = true; }
+    }
+    return merged ? { users: cloudUsers } : null;
+  }
+  // 对于 customers、orders、material_records，用 id 去重并合并
+  if (Array.isArray(cloudData) && Array.isArray(localData)) {
+    var cloudIds = {};
+    cloudData.forEach(function(item) { if (item.id) cloudIds[item.id] = true; });
+    var hasNew = false;
+    for (var j = 0; j < localData.length; j++) {
+      if (localData[j].id && !cloudIds[localData[j].id]) {
+        cloudData.push(localData[j]);
+        cloudIds[localData[j].id] = true;
+        hasNew = true;
+      }
+    }
+    return hasNew ? cloudData : null;
+  }
+  return null;
 }
 
 // ========== 认证 ==========
