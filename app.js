@@ -169,6 +169,8 @@ function _mergeData(fileName, cloudData, localData) {
   }
   // 对于 customers、orders、material_records，用 id 去重并合并
   if (Array.isArray(cloudData) && Array.isArray(localData)) {
+    // 如果云端已清空（管理员重置），不再合并本地数据
+    if (cloudData.length === 0) return [];
     var cloudIds = {};
     cloudData.forEach(function(item) { if (item.id) cloudIds[item.id] = true; });
     var hasNew = false;
