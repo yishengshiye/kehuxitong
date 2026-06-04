@@ -68,9 +68,10 @@ async function cloudPull(fileName) {
   } catch(e) { console.warn('云端拉取失败(' + fileName + '):', e.message); return null; }
 }
 
-// 推数据到 GitHub
-async function cloudPush(fileName, data) {
-  if (!cloudEnabled()) return;
+// 推数据到 GitHub（最多重试2次）
+async function cloudPush(fileName, data, retryCount) {
+  if (!cloudEnabled()) return false;
+  retryCount = retryCount || 0;
   try {
     var body = { message: '[auto] update ' + fileName, content: _utf8ToB64(JSON.stringify(data, null, 2)) };
     if (cloudSHAs[fileName]) body.sha = cloudSHAs[fileName];
@@ -80,12 +81,22 @@ async function cloudPush(fileName, data) {
       body: JSON.stringify(body)
     });
     if (!resp.ok) {
-      if (resp.status === 409) { delete cloudSHAs[fileName]; } // 冲突了，下次重拉
+      // 冲突了：重新拉取 SHA 后再试一次
+      if (resp.status === 409 && retryCount < 2) {
+        var freshPull = await cloudPull(fileName);
+        if (freshPull) {
+          return cloudPush(fileName, data, retryCount + 1);
+        }
+      }
       throw new Error('status ' + resp.status);
     }
     var j = await resp.json();
     cloudSHAs[fileName] = j.content.sha;
-  } catch(e) { console.warn('云端推送失败(' + fileName + '):', e.message); }
+    return true;
+  } catch(e) {
+    console.warn('云端推送失败(' + fileName + '):', e.message);
+    return false;
+  }
 }
 
 // 首次加载：从云端拉全部数据
@@ -209,6 +220,11 @@ async function handleRegister(e) {
   var users = getUsers();
   users.push({ username: username, name: username, passwordHash: hash, securityQuestion: question, securityAnswer: answerHash, createdAt: new Date().toISOString() });
   saveUsers(users);
+  // 等待云端同步完成
+  if (cloudEnabled()) {
+    var ok = await cloudPush('users', { users: users });
+    if (!ok) { setTimeout(function() { toast('⚠ 云端同步失败，请稍后刷新页面重试', 'error'); }, 500); }
+  }
   sessionStorage.setItem(STORAGE_KEY.SESSION, '1');
   enterApp(username);
 }
