@@ -815,15 +815,19 @@ function bindEvents() {
   document.getElementById('show-login-from-forgot').addEventListener('click', function(e) { e.preventDefault(); showLoginForm(); });
   document.getElementById('btn-forgot-check').addEventListener('click', handleForgotCheck);
   document.getElementById('btn-forgot-reset').addEventListener('click', handleForgotReset);
-  document.getElementById('btn-save-token').addEventListener('click', function() {
+  document.getElementById('btn-save-token').addEventListener('click', async function() {
     var token = document.getElementById('setup-token').value.trim();
     var msg = document.getElementById('token-setup-msg');
     if (!token) { msg.textContent = '请输入 Token'; return; }
     if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) { msg.textContent = 'Token 格式不正确，应以 ghp_ 或 github_pat_ 开头'; return; }
     localStorage.setItem('crm_github_token', token);
-    msg.textContent = '已保存！云同步已启用。';
+    msg.textContent = '正在从云端同步数据...';
+    msg.style.color = '#2563eb';
+    // 立即触发云端同步
+    await cloudSyncOnLoad();
+    msg.textContent = '云同步已启用！';
     msg.style.color = '#16a34a';
-    setTimeout(function() { document.getElementById('token-setup').style.display = 'none'; }, 1000);
+    setTimeout(function() { document.getElementById('token-setup').style.display = 'none'; showAuthForms(); }, 1000);
   });
   document.getElementById('btn-logout').addEventListener('click', handleLogout);
 
