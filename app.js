@@ -613,8 +613,9 @@ function getCustName(cid) { var c = allCustomers.find(function(x) { return x.id 
 
 function renderOrderTable(orders) {
   var tb = document.getElementById('order-table-body');
-  if (!orders || !orders.length) { tb.innerHTML = '<tr><td colspan="8" class="empty-state">暂无订单数据</td></tr>'; return; }
+  if (!orders || !orders.length) { tb.innerHTML = '<tr><td colspan="9" class="empty-state">暂无订单数据</td></tr>'; return; }
   tb.innerHTML = orders.map(function(o) {
+    var ssBtn = o.payment_screenshot ? ' <button class="btn btn-sm" onclick="viewScreenshot(\'' + o.id + '\')" title="查看结款截图">截图</button>' : '';
     return '<tr>' +
       '<td><strong>' + esc(getCustName(o.customer_id)) + '</strong></td>' +
       '<td>' + esc(o.product_name || '-') + '</td>' +
@@ -623,7 +624,7 @@ function renderOrderTable(orders) {
       '<td>' + (o.delivery_date || '-') + '</td>' +
       '<td><span class="badge ' + orderBadge(o.status) + '">' + esc(o.status || '沟通中') + '</span></td>' +
       '<td>' + fmtDate(o.created_at) + '</td>' +
-      '<td><div class="action-btns"><button class="btn btn-sm" onclick="openEditOrderModal(\'' + o.id + '\')">编辑</button> <button class="btn btn-sm btn-danger" onclick="openDeleteConfirm(\'order\',\'' + o.id + '\',\'' + esc(o.product_name || '') + '\')">删除</button></div></td></tr>';
+      '<td><div class="action-btns"><button class="btn btn-sm" onclick="openEditOrderModal(\'' + o.id + '\')">编辑</button>' + ssBtn + '<button class="btn btn-sm btn-danger" onclick="openDeleteConfirm(\'order\',\'' + o.id + '\',\'' + esc(o.product_name || '') + '\')">删除</button></div></td></tr>';
   }).join('');
 }
 
@@ -638,7 +639,7 @@ function filterOrders() {
   renderOrderTable(f);
 }
 
-function openAddOrderModal() { editingOrderId = null; document.getElementById('order-modal-title').textContent = '新增订单'; document.getElementById('order-form').reset(); document.getElementById('order-id').value = ''; updateCustomerDropdowns(); document.getElementById('order-modal').style.display = 'flex'; }
+function openAddOrderModal() { editingOrderId = null; document.getElementById('order-modal-title').textContent = '新增订单'; document.getElementById('order-form').reset(); document.getElementById('order-id').value = ''; clearScreenshotPreview(); updateCustomerDropdowns(); document.getElementById('order-modal').style.display = 'flex'; }
 
 function openEditOrderModal(id) {
   var o = allOrders.find(function(x) { return x.id === id; }); if (!o) return;
@@ -657,10 +658,69 @@ function openEditOrderModal(id) {
   document.getElementById('order-shipping-included').value = o.shipping_included || '';
   document.getElementById('order-sample-record').value = o.sample_record || '';
   document.getElementById('order-communication-notes').value = o.communication_notes || '';
+  // 显示已有截图
+  if (o.payment_screenshot) {
+    pendingScreenshotData = o.payment_screenshot;
+    document.getElementById('order-screenshot-img').src = o.payment_screenshot;
+    document.getElementById('order-screenshot-preview').style.display = 'block';
+  } else {
+    clearScreenshotPreview();
+  }
   document.getElementById('order-modal').style.display = 'flex';
 }
 
-function closeOrderModal() { document.getElementById('order-modal').style.display = 'none'; editingOrderId = null; }
+function closeOrderModal() { document.getElementById('order-modal').style.display = 'none'; editingOrderId = null; clearScreenshotPreview(); }
+
+// ========== 货款结款截图 ==========
+var pendingScreenshotData = '';
+
+function handleScreenshotUpload(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('图片不能超过5MB', 'error'); input.value = ''; return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      var maxW = 800, maxH = 600;
+      var w = img.width, h = img.height;
+      if (w > maxW) { h = h * maxW / w; w = maxW; }
+      if (h > maxH) { w = w * maxH / h; h = maxH; }
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      pendingScreenshotData = canvas.toDataURL('image/jpeg', 0.7);
+      document.getElementById('order-screenshot-img').src = pendingScreenshotData;
+      document.getElementById('order-screenshot-preview').style.display = 'block';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeScreenshot() {
+  pendingScreenshotData = '';
+  document.getElementById('order-screenshot-preview').style.display = 'none';
+  document.getElementById('order-payment-screenshot').value = '';
+}
+
+function clearScreenshotPreview() {
+  pendingScreenshotData = '';
+  document.getElementById('order-screenshot-preview').style.display = 'none';
+  document.getElementById('order-payment-screenshot').value = '';
+}
+
+function viewScreenshot(orderId) {
+  var o = allOrders.find(function(x) { return x.id === orderId; });
+  if (!o || !o.payment_screenshot) { toast('没有结款截图', 'error'); return; }
+  document.getElementById('screenshot-full-img').src = o.payment_screenshot;
+  document.getElementById('screenshot-modal').style.display = 'flex';
+}
+
+function closeScreenshotModal() {
+  document.getElementById('screenshot-modal').style.display = 'none';
+}
 
 function saveOrder(e) {
   e.preventDefault();
@@ -682,6 +742,13 @@ function saveOrder(e) {
     sample_record: document.getElementById('order-sample-record').value.trim(),
     communication_notes: document.getElementById('order-communication-notes').value.trim(),
   };
+  // 处理截图：新增截图 > 保留旧截图 > 无截图
+  if (pendingScreenshotData) {
+    d.payment_screenshot = pendingScreenshotData;
+  } else if (editingOrderId) {
+    var oldOrder = allOrders.find(function(x) { return x.id === editingOrderId; });
+    if (oldOrder && oldOrder.payment_screenshot) d.payment_screenshot = oldOrder.payment_screenshot;
+  }
   if (editingOrderId) {
     var i = allOrders.findIndex(function(x) { return x.id === editingOrderId; });
     if (i !== -1) { d.id = editingOrderId; d.user_id = allOrders[i].user_id; d.created_at = allOrders[i].created_at; d.updated_at = now; allOrders[i] = d; }
@@ -1099,8 +1166,11 @@ function bindEvents() {
   document.getElementById('btn-cancel-confirm').addEventListener('click', closeDeleteConfirm);
   document.getElementById('confirm-modal').addEventListener('click', function(e) { if (e.target === document.getElementById('confirm-modal')) closeDeleteConfirm(); });
 
+  // 截图弹窗
+  document.getElementById('screenshot-modal').addEventListener('click', function(e) { if (e.target === document.getElementById('screenshot-modal')) closeScreenshotModal(); });
+
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') { closeCustomerModal(); closeOrderModal(); closeMaterialModal(); closeDeleteConfirm(); }
+    if (e.key === 'Escape') { closeCustomerModal(); closeOrderModal(); closeMaterialModal(); closeDeleteConfirm(); closeScreenshotModal(); }
   });
 }
 
