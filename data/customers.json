@@ -1,5 +1,22 @@
 [
   {
+    "name": "卢总",
+    "company_name": "个体",
+    "country": "郑州",
+    "phone": "",
+    "wechat": "",
+    "source": "医圣",
+    "customer_level": "VIP",
+    "status": "长期客户",
+    "first_contact_date": null,
+    "last_contact_date": null,
+    "notes": "",
+    "id": "mq94tth3_s9pfnt",
+    "user_id": "潮汕",
+    "created_at": "2026-06-11T06:44:16.119Z",
+    "updated_at": "2026-06-11T06:44:16.119Z"
+  },
+  {
     "name": "线下萧",
     "company_name": "",
     "country": "云南",
