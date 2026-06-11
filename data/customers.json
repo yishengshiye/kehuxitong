@@ -1,5 +1,22 @@
 [
   {
+    "name": "徐总",
+    "company_name": "蒲茸巷",
+    "country": "浙江",
+    "phone": "",
+    "wechat": "",
+    "source": "客户介绍客户",
+    "customer_level": "VIP",
+    "status": "长期客户",
+    "first_contact_date": null,
+    "last_contact_date": null,
+    "notes": "",
+    "id": "mq94r43y_sp5cre",
+    "user_id": "潮汕",
+    "created_at": "2026-06-11T06:42:09.934Z",
+    "updated_at": "2026-06-11T06:42:09.934Z"
+  },
+  {
     "name": "小野总",
     "company_name": "繁英",
     "country": "郑州",
