@@ -7,7 +7,7 @@
     "quotation_price": "0.3",
     "order_quantity": "5000",
     "delivery_date": null,
-    "status": "生产中",
+    "status": "已完成",
     "tax_included": "不含税",
     "shipping_included": "不含运费",
     "sample_record": "5000包材",
@@ -16,7 +16,7 @@
     "id": "mqqegm2f_tj63ir",
     "user_id": "潮汕",
     "created_at": "2026-06-23T08:46:01.143Z",
-    "updated_at": "2026-06-23T08:46:01.143Z"
+    "updated_at": "2026-06-23T08:46:16.896Z"
   },
   {
     "customer_id": "mqqe632m_p4pvp2",
