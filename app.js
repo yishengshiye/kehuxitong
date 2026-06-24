@@ -235,24 +235,33 @@ async function _pullDeletedIds(fileName) {
 
 // ========== 认证 ==========
 function getUsers() {
-  var auth = storageGet(STORAGE_KEY.AUTH);
-  if (!auth) auth = { users: [] };
-  // 兼容旧版单用户格式 → 多用户格式
-  if (auth.passwordHash && !auth.users) {
-    auth = { users: [{ username: auth.username || auth.name || '管理员', name: auth.name || auth.username || '管理员', passwordHash: auth.passwordHash, securityQuestion: '', securityAnswer: '', createdAt: auth.createdAt || '' }] };
-    storageSet(STORAGE_KEY.AUTH, auth);
+  try {
+    var auth = storageGet(STORAGE_KEY.AUTH);
+    if (!auth) auth = { users: [] };
+    // 兼容旧版单用户格式 → 多用户格式
+    if (auth.passwordHash && !auth.users) {
+      auth = { users: [{ username: auth.username || auth.name || '管理员', name: auth.name || auth.username || '管理员', passwordHash: auth.passwordHash, securityQuestion: '', securityAnswer: '', createdAt: auth.createdAt || '' }] };
+      storageSet(STORAGE_KEY.AUTH, auth);
+    }
+    if (!auth.users) auth.users = [];
+    // 合并初始用户数据：将 window.__INITIAL_USERS__ 中本地没有的用户补进来
+    if (window.__INITIAL_USERS__ && window.__INITIAL_USERS__.users) {
+      var merged = false;
+      for (var i = 0; i < window.__INITIAL_USERS__.users.length; i++) {
+        var initUser = window.__INITIAL_USERS__.users[i];
+        var found = false;
+        for (var j = 0; j < auth.users.length; j++) {
+          if (auth.users[j].username === initUser.username) { found = true; break; }
+        }
+        if (!found) { auth.users.push(initUser); merged = true; }
+      }
+      if (merged) { storageSet(STORAGE_KEY.AUTH, auth); }
+    }
+    return auth.users;
+  } catch(e) {
+    console.error('getUsers error:', e);
+    return [];
   }
-  if (!auth.users) auth.users = [];
-  // 合并初始用户数据：将 window.__INITIAL_USERS__ 中本地没有的用户补进来
-  if (window.__INITIAL_USERS__ && window.__INITIAL_USERS__.users) {
-    var merged = false;
-    window.__INITIAL_USERS__.users.forEach(function(initUser) {
-      var found = auth.users.some(function(u) { return u.username === initUser.username; });
-      if (!found) { auth.users.push(initUser); merged = true; }
-    });
-    if (merged) { storageSet(STORAGE_KEY.AUTH, auth); }
-  }
-  return auth.users;
 }
 
 function saveUsers(users) { var d = { users: users }; storageSet(STORAGE_KEY.AUTH, d); cloudPush('users', d); }
@@ -376,23 +385,29 @@ async function handleLogin(e) {
   var username = document.getElementById('login-username').value.trim();
   var pw = document.getElementById('login-password').value;
   var err = document.getElementById('auth-error');
+  err.style.display = 'none';
   if (!username) { err.textContent = '请输入账号'; err.style.display = 'block'; return; }
   if (!pw) { err.textContent = '请输入密码'; err.style.display = 'block'; return; }
-  var user = findUser(username);
-  if (!user) { err.textContent = '账号不存在，请检查账号名或联系管理员'; err.style.display = 'block'; return; }
-  var inputHash = await hashPassword(pw);
-  if (inputHash !== user.passwordHash) { err.textContent = '密码错误，请重试'; err.style.display = 'block'; return; }
-  sessionStorage.setItem(STORAGE_KEY.SESSION, '1');
-  sessionStorage.setItem('crm_logged_user', user.name || username);
-  // 有明确角色的直接用；没有的看是不是第一个注册的用户
-  var role = user.role;
-  if (!role) {
-    var allUsers = getUsers();
-    var firstUser = allUsers.length > 0 ? allUsers[0].username : '';
-    role = (user.username === firstUser) ? '总经理' : '业务员';
+  try {
+    var user = findUser(username);
+    if (!user) { err.textContent = '账号不存在，请检查账号名（当前系统有：' + getUsers().map(function(u){return u.username;}).join('、') + '）'; err.style.display = 'block'; return; }
+    var inputHash = await hashPassword(pw);
+    if (inputHash !== user.passwordHash) { err.textContent = '密码错误，请重试'; err.style.display = 'block'; return; }
+    sessionStorage.setItem(STORAGE_KEY.SESSION, '1');
+    sessionStorage.setItem('crm_logged_user', user.name || username);
+    var role = user.role;
+    if (!role) {
+      var allUsers = getUsers();
+      var firstUser = allUsers.length > 0 ? allUsers[0].username : '';
+      role = (user.username === firstUser) ? '总经理' : '业务员';
+    }
+    sessionStorage.setItem('crm_role', role);
+    await enterApp(user.name || username);
+  } catch(ex) {
+    err.textContent = '系统错误：' + ex.message;
+    err.style.display = 'block';
+    console.error(ex);
   }
-  sessionStorage.setItem('crm_role', role);
-  await enterApp(user.name || username);
 }
 
 // ---- 忘记密码 ----
