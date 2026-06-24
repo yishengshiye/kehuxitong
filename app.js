@@ -519,18 +519,27 @@ function updateCustomerUserFilter() {
     sel.innerHTML = opts;
     // 更新表头
     var thead = document.querySelector('#customer-table thead tr');
-    if (thead) thead.innerHTML = '<th>客户姓名</th><th>公司名称</th><th>国家</th><th>电话</th><th>等级</th><th>状态</th><th>创建人</th><th>最近联系</th><th>操作</th>';
+    if (thead) thead.innerHTML = '<th>客户姓名</th><th>公司名称</th><th>国家</th><th>电话</th><th>等级</th><th>状态</th><th>创建人</th><th>成交总额</th><th>最近联系</th><th>操作</th>';
   } else {
     sel.style.display = 'none';
     var thead2 = document.querySelector('#customer-table thead tr');
-    if (thead2) thead2.innerHTML = '<th>客户姓名</th><th>公司名称</th><th>国家</th><th>电话</th><th>等级</th><th>状态</th><th>最近联系</th><th>操作</th>';
+    if (thead2) thead2.innerHTML = '<th>客户姓名</th><th>公司名称</th><th>国家</th><th>电话</th><th>等级</th><th>状态</th><th>成交总额</th><th>最近联系</th><th>操作</th>';
   }
+}
+
+function getCustomerTotalAmount(customerId) {
+  var orders = getVisibleOrders().filter(function(o) { return o.customer_id === customerId; });
+  var total = orders.reduce(function(s, o) {
+    var p = parseFloat(o.quotation_price), q = parseFloat(o.order_quantity);
+    return s + ((!isNaN(p) && !isNaN(q)) ? p * q : 0);
+  }, 0);
+  return total > 0 ? '¥' + total.toFixed(2) : '-';
 }
 
 function renderCustomerTable(customers) {
   var tb = document.getElementById('customer-table-body');
   var showUser = isManager();
-  var colSpan = showUser ? 9 : 8;
+  var colSpan = showUser ? 10 : 9;
   if (!customers || !customers.length) { tb.innerHTML = '<tr><td colspan="' + colSpan + '" class="empty-state">暂无客户数据</td></tr>'; return; }
   tb.innerHTML = customers.map(function(c) {
     var lc = c.last_contact_date || c.updated_at || '';
@@ -543,6 +552,7 @@ function renderCustomerTable(customers) {
       '<td><span class="badge ' + levelBadge(c.customer_level) + '">' + esc(c.customer_level || '-') + '</span></td>' +
       '<td><span class="badge ' + statusBadge(c.status) + '">' + esc(c.status || '-') + '</span></td>' +
       userCell +
+      '<td style="font-weight:600;color:#1677ff;">' + getCustomerTotalAmount(c.id) + '</td>' +
       '<td>' + fmtDate(lc) + '</td>' +
       '<td><div class="action-btns"><button class="btn btn-sm" onclick="openEditCustomerModal(\'' + c.id + '\')">编辑</button> <button class="btn btn-sm btn-danger" onclick="openDeleteConfirm(\'customer\',\'' + c.id + '\',\'' + esc(c.name || '') + '\')">删除</button></div></td></tr>';
   }).join('');
@@ -1155,9 +1165,9 @@ function downloadCSV(rows, filename) {
 
 function exportCustomers() {
   var cs = getVisibleCustomers();
-  var rows = [['客户姓名', '公司名称', '国家', '电话', '微信', '阿里来源', '等级', '状态', '首次联系', '最近联系', '备注', '创建时间']];
+  var rows = [['客户姓名', '公司名称', '国家', '电话', '微信', '阿里来源', '等级', '状态', '成交总额', '首次联系', '最近联系', '备注', '创建时间']];
   cs.forEach(function(c) {
-    rows.push([c.name, c.company_name, c.country, c.phone, c.wechat, c.source, c.customer_level, c.status, c.first_contact_date, c.last_contact_date, c.notes, fmtDateTime(c.created_at)]);
+    rows.push([c.name, c.company_name, c.country, c.phone, c.wechat, c.source, c.customer_level, c.status, getCustomerTotalAmount(c.id), c.first_contact_date, c.last_contact_date, c.notes, fmtDateTime(c.created_at)]);
   });
   downloadCSV(rows, '客户列表_' + new Date().toISOString().slice(0, 10));
 }
