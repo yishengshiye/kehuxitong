@@ -1266,6 +1266,13 @@ async function resetAllUsers() {
 
 // ========== 启动 ==========
 document.addEventListener('DOMContentLoaded', async function() {
+  // ?reset=1 清除浏览器缓存数据并重新加载
+  if (window.location.search.indexOf('reset=1') !== -1) {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = window.location.origin + window.location.pathname;
+    return;
+  }
   // 检查是否需要重置所有用户
   if (window.location.search.indexOf('reset-users=1') !== -1) {
     await resetAllUsers();
