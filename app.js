@@ -59,22 +59,6 @@ function getVisibleMaterialRecords() {
 function storageGet(key) { try { var r = localStorage.getItem(key); return r ? JSON.parse(r) : null; } catch(e) { return null; } }
 function storageSet(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
-// 从本地 JSON 文件加载数据（file:// 协议下生效）
-function loadFromDataDir(fileName) {
-  try {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'data/' + fileName + '.json', false);
-    xhr.overrideMimeType('application/json');
-    xhr.send(null);
-    if (xhr.status === 200 || xhr.status === 0) {
-      return JSON.parse(xhr.responseText);
-    }
-  } catch(e) {
-    console.warn('无法从data/目录加载 ' + fileName + ':', e.message);
-  }
-  return null;
-}
-
 // ========== GitHub 云同步 ==========
 var GITHUB_API_BASE = 'https://api.github.com/repos/yishengshiye/kehuxitong/contents/data/';
 var cloudSHAs = {};
@@ -617,7 +601,7 @@ function saveCustomer(e) {
 // ================================================================
 //                      订 单
 // ================================================================
-async function loadOrders() { allOrders = storageGet(STORAGE_KEY.ORDERS); if (!allOrders || !allOrders.length) { try { var resp = await fetch('data/orders.json'); if (resp.ok) { allOrders = await resp.json(); storageSet(STORAGE_KEY.ORDERS, allOrders); } else { allOrders = []; } } catch(e) { allOrders = []; } } // 迁移旧数据：payment_screenshot → deposit_screenshot allOrders.forEach(function(o) { if (o.payment_screenshot && !o.deposit_screenshot) { o.deposit_screenshot = o.payment_screenshot; delete o.payment_screenshot; } }); renderOrderTable(getVisibleOrders()); updateOrderCustomerFilter(); }
+async function loadOrders() { allOrders = storageGet(STORAGE_KEY.ORDERS); if (!allOrders || !allOrders.length) { try { var resp = await fetch('data/orders.json'); if (resp.ok) { allOrders = await resp.json(); storageSet(STORAGE_KEY.ORDERS, allOrders); } else { allOrders = []; } } catch(e) { allOrders = []; } } allOrders.forEach(function(o) { if (o.payment_screenshot && !o.deposit_screenshot) { o.deposit_screenshot = o.payment_screenshot; delete o.payment_screenshot; } }); renderOrderTable(getVisibleOrders()); updateOrderCustomerFilter(); }
 function saveOrders() { storageSet(STORAGE_KEY.ORDERS, allOrders); cloudPush('orders', allOrders); }
 
 function updateCustomerDropdowns() {
