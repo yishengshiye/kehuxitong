@@ -616,7 +616,7 @@ function saveCustomer(e) {
 // ================================================================
 //                      订 单
 // ================================================================
-async function loadOrders() { allOrders = storageGet(STORAGE_KEY.ORDERS); if (!allOrders || !allOrders.length) { try { var resp = await fetch('data/orders.json'); if (resp.ok) { allOrders = await resp.json(); storageSet(STORAGE_KEY.ORDERS, allOrders); } else { allOrders = []; } } catch(e) { allOrders = []; } } allOrders.forEach(function(o) { if (o.payment_screenshot && !o.deposit_screenshot) { o.deposit_screenshot = o.payment_screenshot; delete o.payment_screenshot; } }); renderOrderTable(getVisibleOrders()); updateOrderCustomerFilter(); }
+async function loadOrders() { allOrders = storageGet(STORAGE_KEY.ORDERS); if (!allOrders || !allOrders.length) { try { var resp = await fetch('data/orders.json'); if (resp.ok) { allOrders = await resp.json(); storageSet(STORAGE_KEY.ORDERS, allOrders); } else { allOrders = []; } } catch(e) { allOrders = []; } } allOrders.forEach(function(o) { if (o.payment_screenshot && !o.deposit_screenshot) { o.deposit_screenshot = o.payment_screenshot; delete o.payment_screenshot; } }); updateOrderMonthFilter(); renderOrderTable(getVisibleOrders()); updateOrderCustomerFilter(); }
 function saveOrders() { storageSet(STORAGE_KEY.ORDERS, allOrders); cloudPush('orders', allOrders); }
 
 function updateCustomerDropdowns() {
@@ -635,9 +635,30 @@ function updateOrderCustomerFilter() {
 
 function getCustName(cid) { var c = allCustomers.find(function(x) { return x.id === cid; }); return c ? c.name : '未知客户'; }
 
+function calcTotalAmount(o) {
+  var price = parseFloat(o.quotation_price);
+  var qty = parseFloat(o.order_quantity);
+  if (isNaN(price) || isNaN(qty)) return '-';
+  return '¥' + (price * qty).toFixed(2);
+}
+
+function updateTotalAmountDisplay() {
+  var priceEl = document.getElementById('order-quotation-price');
+  var qtyEl = document.getElementById('order-quantity');
+  var totalEl = document.getElementById('order-total-amount');
+  if (!priceEl || !qtyEl || !totalEl) return;
+  var price = parseFloat(priceEl.value);
+  var qty = parseFloat(qtyEl.value);
+  if (!isNaN(price) && !isNaN(qty)) {
+    totalEl.value = '¥' + (price * qty).toFixed(2);
+  } else {
+    totalEl.value = '';
+  }
+}
+
 function renderOrderTable(orders) {
   var tb = document.getElementById('order-table-body');
-  if (!orders || !orders.length) { tb.innerHTML = '<tr><td colspan="9" class="empty-state">暂无订单数据</td></tr>'; return; }
+  if (!orders || !orders.length) { tb.innerHTML = '<tr><td colspan="10" class="empty-state">暂无订单数据</td></tr>'; return; }
   tb.innerHTML = orders.map(function(o) {
     var depositBtn = o.deposit_screenshot ? ' <button class="btn btn-sm" onclick="viewScreenshot(\'' + o.id + '\',\'deposit\')" title="查看定金截图">定金截图</button>' : '';
     var balanceBtn = o.balance_screenshot ? ' <button class="btn btn-sm" onclick="viewScreenshot(\'' + o.id + '\',\'balance\')" title="查看尾款截图">尾款截图</button>' : '';
@@ -646,6 +667,7 @@ function renderOrderTable(orders) {
       '<td>' + esc(o.product_name || '-') + '</td>' +
       '<td>' + (o.order_quantity || '-') + '</td>' +
       '<td>' + (o.quotation_price ? '¥' + o.quotation_price : '-') + '</td>' +
+      '<td style="font-weight:600;color:#1677ff;">' + calcTotalAmount(o) + '</td>' +
       '<td>' + (o.delivery_date || '-') + '</td>' +
       '<td><span class="badge ' + orderBadge(o.status) + '">' + esc(o.status || '沟通中') + '</span></td>' +
       '<td>' + fmtDate(o.created_at) + '</td>' +
@@ -657,14 +679,35 @@ function filterOrders() {
   var s = document.getElementById('order-search').value.toLowerCase().trim();
   var sf = document.getElementById('order-status-filter').value;
   var cf = document.getElementById('order-customer-filter').value;
+  var mf = document.getElementById('order-month-filter').value;
   var f = getVisibleOrders();
   if (s) f = f.filter(function(o) { return (o.product_name && o.product_name.toLowerCase().indexOf(s) !== -1) || getCustName(o.customer_id).toLowerCase().indexOf(s) !== -1; });
   if (sf) f = f.filter(function(o) { return o.status === sf; });
   if (cf) f = f.filter(function(o) { return o.customer_id === cf; });
+  if (mf) f = f.filter(function(o) { return o.created_at && o.created_at.substring(0, 7) === mf; });
   renderOrderTable(f);
 }
 
-function openAddOrderModal() { editingOrderId = null; document.getElementById('order-modal-title').textContent = '新增订单'; document.getElementById('order-form').reset(); document.getElementById('order-id').value = ''; clearScreenshotPreview(); updateCustomerDropdowns(); document.getElementById('order-modal').style.display = 'flex'; }
+function updateOrderMonthFilter() {
+  var sel = document.getElementById('order-month-filter');
+  if (!sel) return;
+  var orders = getVisibleOrders();
+  var months = {};
+  orders.forEach(function(o) {
+    if (o.created_at) {
+      var m = o.created_at.substring(0, 7);
+      months[m] = true;
+    }
+  });
+  var list = Object.keys(months).sort().reverse();
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">全部月份</option>' + list.map(function(m) {
+    return '<option value="' + m + '">' + m + '</option>';
+  }).join('');
+  if (cur) sel.value = cur;
+}
+
+function openAddOrderModal() { editingOrderId = null; document.getElementById('order-modal-title').textContent = '新增订单'; document.getElementById('order-form').reset(); document.getElementById('order-id').value = ''; clearScreenshotPreview(); updateCustomerDropdowns(); document.getElementById('order-total-amount').value = ''; document.getElementById('order-modal').style.display = 'flex'; }
 
 function openEditOrderModal(id) {
   var o = allOrders.find(function(x) { return x.id === id; }); if (!o) return;
@@ -697,6 +740,7 @@ function openEditOrderModal(id) {
   if (!o.deposit_screenshot && !o.balance_screenshot) {
     clearScreenshotPreview();
   }
+  updateTotalAmountDisplay();
   document.getElementById('order-modal').style.display = 'flex';
 }
 
@@ -812,7 +856,7 @@ function saveOrder(e) {
   } else { d.id = genId(); d.user_id = getCurrentUser(); d.created_at = now; d.updated_at = now; allOrders.unshift(d); }
   saveOrders();
   toast(editingOrderId ? '订单已更新' : '订单添加成功', 'success');
-  closeOrderModal(); renderOrderTable(getVisibleOrders()); updateOrderCustomerFilter(); loadDashboard();
+  closeOrderModal(); updateOrderMonthFilter(); renderOrderTable(getVisibleOrders()); updateOrderCustomerFilter(); loadDashboard();
 }
 
 // ================================================================
@@ -1051,6 +1095,14 @@ function loadDashboard() {
   });
   var withStock = Object.values(allProducts).filter(function(p) { return p.tin - p.tout > 0; }).length;
   document.getElementById('stat-low-stock').textContent = withStock;
+
+  // 本月订单总额
+  var thisMonth = now.toISOString().substring(0, 7);
+  var monthlyTotal = vo.filter(function(o) { return o.created_at && o.created_at.substring(0, 7) === thisMonth; }).reduce(function(s, o) {
+    var p = parseFloat(o.quotation_price), q = parseFloat(o.order_quantity);
+    return s + ((!isNaN(p) && !isNaN(q)) ? p * q : 0);
+  }, 0);
+  document.getElementById('stat-monthly-total').textContent = '¥' + monthlyTotal.toFixed(2);
 }
 
 // ================================================================
@@ -1112,9 +1164,12 @@ function exportCustomers() {
 
 function exportOrders() {
   var orders = getVisibleOrders();
-  var rows = [['客户', '产品名称', '尺寸', '商标要求', '报价(¥)', '数量', '交期', '是否含税', '是否含运费', '状态', '打样记录', '沟通备注', '创建时间']];
+  var rows = [['客户', '产品名称', '尺寸', '商标要求', '报价(¥)', '数量', '总金额', '交期', '是否含税', '是否含运费', '状态', '打样记录', '沟通备注', '创建时间']];
   orders.forEach(function(o) {
-    rows.push([getCustName(o.customer_id), o.product_name, o.size, o.logo_requirements, o.quotation_price, o.order_quantity, o.delivery_date, o.tax_included, o.shipping_included, o.status, o.sample_record, o.communication_notes, fmtDateTime(o.created_at)]);
+    var price = parseFloat(o.quotation_price);
+    var qty = parseFloat(o.order_quantity);
+    var total = (!isNaN(price) && !isNaN(qty)) ? (price * qty).toFixed(2) : '';
+    rows.push([getCustName(o.customer_id), o.product_name, o.size, o.logo_requirements, o.quotation_price, o.order_quantity, total, o.delivery_date, o.tax_included, o.shipping_included, o.status, o.sample_record, o.communication_notes, fmtDateTime(o.created_at)]);
   });
   downloadCSV(rows, '订单列表_' + new Date().toISOString().slice(0, 10));
 }
@@ -1204,6 +1259,9 @@ function bindEvents() {
   document.getElementById('order-search').addEventListener('input', filterOrders);
   document.getElementById('order-status-filter').addEventListener('change', filterOrders);
   document.getElementById('order-customer-filter').addEventListener('change', filterOrders);
+  document.getElementById('order-month-filter').addEventListener('change', filterOrders);
+  document.getElementById('order-quotation-price').addEventListener('input', updateTotalAmountDisplay);
+  document.getElementById('order-quantity').addEventListener('input', updateTotalAmountDisplay);
 
   // 包材
   document.getElementById('material-customer-select').addEventListener('change', onMaterialCustomerChange);
