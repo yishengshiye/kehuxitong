@@ -350,11 +350,19 @@
           <div class="form-group"><label>打样记录</label><textarea id="order-sample-record" rows="2" placeholder="如：2026-03-15 寄出样品给客户确认"></textarea></div>
           <div class="form-group"><label>沟通备注</label><textarea id="order-communication-notes" rows="3" placeholder="记录每次与客户沟通的要点..."></textarea></div>
           <div class="form-group">
-            <label>货款结款截图</label>
-            <input type="file" id="order-payment-screenshot" accept="image/*" style="display:block;margin-top:4px;" onchange="handleScreenshotUpload(this)">
-            <div id="order-screenshot-preview" style="margin-top:8px;display:none;">
-              <img id="order-screenshot-img" style="max-width:200px;max-height:150px;border-radius:6px;border:1px solid #ddd;">
-              <button type="button" class="btn btn-sm btn-danger" onclick="removeScreenshot()" style="margin-left:8px;">移除截图</button>
+            <label>定金截图</label>
+            <input type="file" id="order-deposit-screenshot" accept="image/*" style="display:block;margin-top:4px;" onchange="handleScreenshotUpload(this, 'deposit')">
+            <div id="order-deposit-screenshot-preview" style="margin-top:8px;display:none;">
+              <img id="order-deposit-screenshot-img" style="max-width:200px;max-height:150px;border-radius:6px;border:1px solid #ddd;">
+              <button type="button" class="btn btn-sm btn-danger" onclick="removeScreenshot('deposit')" style="margin-left:8px;">移除截图</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>尾款截图</label>
+            <input type="file" id="order-balance-screenshot" accept="image/*" style="display:block;margin-top:4px;" onchange="handleScreenshotUpload(this, 'balance')">
+            <div id="order-balance-screenshot-preview" style="margin-top:8px;display:none;">
+              <img id="order-balance-screenshot-img" style="max-width:200px;max-height:150px;border-radius:6px;border:1px solid #ddd;">
+              <button type="button" class="btn btn-sm btn-danger" onclick="removeScreenshot('balance')" style="margin-left:8px;">移除截图</button>
             </div>
           </div>
           <div class="modal-footer">
@@ -397,7 +405,7 @@
   <!-- ========== 截图查看弹窗 ========== -->
   <div id="screenshot-modal" class="modal-overlay" style="display:none;">
     <div class="modal" style="max-width:90vw;">
-      <div class="modal-header"><h3>货款结款截图</h3><button class="btn-close" onclick="closeScreenshotModal()">&times;</button></div>
+      <div class="modal-header"><h3 id="screenshot-modal-title">截图查看</h3><button class="btn-close" onclick="closeScreenshotModal()">&times;</button></div>
       <div class="modal-body" style="text-align:center;">
         <img id="screenshot-full-img" style="max-width:100%;max-height:70vh;border-radius:6px;">
       </div>
@@ -419,6 +427,10 @@
   </div>
 
   <div id="toast" class="toast" style="display:none;"></div>
-  <script src="app.js?v=14"></script>
+  <script>
+    // 初始用户数据（从 data/users.json 同步 - 含田一丁、小宝、潮汕）
+    window.__INITIAL_USERS__ = {"users":[{"username":"田一丁","name":"田一丁","passwordHash":"61fa22b8fc647c554d97e7320d8517d64646f3c63eb85841cbdb539f18c9e832","securityQuestion":"你的生日是几月几日？","securityAnswer":"61fa22b8fc647c554d97e7320d8517d64646f3c63eb85841cbdb539f18c9e832","role":"总经理","createdAt":"2026-06-04T09:32:27.954Z"},{"username":"小宝","name":"小宝","passwordHash":"a286316f58846d430072c50d6746d9372980f453a935fa0ed9527cd929ef6aa9","securityQuestion":"你的生日是几月几日？","securityAnswer":"a286316f58846d430072c50d6746d9372980f453a935fa0ed9527cd929ef6aa9","role":"业务员","createdAt":"2026-06-04T09:36:54.551Z"},{"username":"潮汕","name":"潮汕","passwordHash":"fadcf2ea909ca1a83722bc3c167cc3a9d7d8ef6829ec43d6215de8f89b7bc422","securityQuestion":"你的生日是几月几日？","securityAnswer":"7c29542ba7478ef5086f7107f1c11620a201e3ac3d23648977a289d9de73e7b1","role":"业务员","createdAt":"2026-06-11T06:39:38.987Z"}]};
+  </script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

@@ -59,6 +59,22 @@ function getVisibleMaterialRecords() {
 function storageGet(key) { try { var r = localStorage.getItem(key); return r ? JSON.parse(r) : null; } catch(e) { return null; } }
 function storageSet(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
+// 从本地 JSON 文件加载数据（file:// 协议下生效）
+function loadFromDataDir(fileName) {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'data/' + fileName + '.json', false);
+    xhr.overrideMimeType('application/json');
+    xhr.send(null);
+    if (xhr.status === 200 || xhr.status === 0) {
+      return JSON.parse(xhr.responseText);
+    }
+  } catch(e) {
+    console.warn('无法从data/目录加载 ' + fileName + ':', e.message);
+  }
+  return null;
+}
+
 // ========== GitHub 云同步 ==========
 var GITHUB_API_BASE = 'https://api.github.com/repos/yishengshiye/kehuxitong/contents/data/';
 var cloudSHAs = {};
@@ -236,14 +252,23 @@ async function _pullDeletedIds(fileName) {
 // ========== 认证 ==========
 function getUsers() {
   var auth = storageGet(STORAGE_KEY.AUTH);
-  if (!auth) return [];
+  if (!auth) auth = { users: [] };
   // 兼容旧版单用户格式 → 多用户格式
   if (auth.passwordHash && !auth.users) {
-    var migrated = { users: [{ username: auth.username || auth.name || '管理员', name: auth.name || auth.username || '管理员', passwordHash: auth.passwordHash, securityQuestion: '', securityAnswer: '', createdAt: auth.createdAt || '' }] };
-    storageSet(STORAGE_KEY.AUTH, migrated);
-    return migrated.users;
+    auth = { users: [{ username: auth.username || auth.name || '管理员', name: auth.name || auth.username || '管理员', passwordHash: auth.passwordHash, securityQuestion: '', securityAnswer: '', createdAt: auth.createdAt || '' }] };
+    storageSet(STORAGE_KEY.AUTH, auth);
   }
-  return auth.users || [];
+  if (!auth.users) auth.users = [];
+  // 合并初始用户数据：将 window.__INITIAL_USERS__ 中本地没有的用户补进来
+  if (window.__INITIAL_USERS__ && window.__INITIAL_USERS__.users) {
+    var merged = false;
+    window.__INITIAL_USERS__.users.forEach(function(initUser) {
+      var found = auth.users.some(function(u) { return u.username === initUser.username; });
+      if (!found) { auth.users.push(initUser); merged = true; }
+    });
+    if (merged) { storageSet(STORAGE_KEY.AUTH, auth); }
+  }
+  return auth.users;
 }
 
 function saveUsers(users) { var d = { users: users }; storageSet(STORAGE_KEY.AUTH, d); cloudPush('users', d); }
@@ -359,7 +384,7 @@ async function handleRegister(e) {
   sessionStorage.setItem(STORAGE_KEY.SESSION, '1');
   sessionStorage.setItem('crm_logged_user', username);
   sessionStorage.setItem('crm_role', role);
-  enterApp(username);
+  await enterApp(username);
 }
 
 async function handleLogin(e) {
@@ -383,7 +408,7 @@ async function handleLogin(e) {
     role = (user.username === firstUser) ? '总经理' : '业务员';
   }
   sessionStorage.setItem('crm_role', role);
-  enterApp(user.name || username);
+  await enterApp(user.name || username);
 }
 
 // ---- 忘记密码 ----
@@ -448,15 +473,15 @@ function handleLogout() {
   showAuthForms();
 }
 
-function enterApp(userName) {
+async function enterApp(userName) {
   document.getElementById('auth-section').style.display = 'none';
   document.getElementById('app-section').style.display = 'flex';
   var role = getCurrentRole();
   document.getElementById('user-name').textContent = userName + ' (' + role + ')';
   sessionStorage.setItem('crm_logged_user', userName);
   switchView('dashboard');
+  await loadCustomers(); await loadOrders(); loadMaterialRecords();
   loadDashboard();
-  loadCustomers(); loadOrders(); loadMaterialRecords();
 }
 
 function resetSystem() {
@@ -479,7 +504,7 @@ function switchView(viewName) {
 // ================================================================
 //                      客 户
 // ================================================================
-function loadCustomers() { allCustomers = storageGet(STORAGE_KEY.CUSTOMERS) || []; updateCustomerUserFilter(); renderCustomerTable(getVisibleCustomers()); updateCustomerDropdowns(); }
+async function loadCustomers() { allCustomers = storageGet(STORAGE_KEY.CUSTOMERS); if (!allCustomers || !allCustomers.length) { try { var resp = await fetch('data/customers.json'); if (resp.ok) { allCustomers = await resp.json(); storageSet(STORAGE_KEY.CUSTOMERS, allCustomers); } else { allCustomers = []; } } catch(e) { allCustomers = []; } } updateCustomerUserFilter(); renderCustomerTable(getVisibleCustomers()); updateCustomerDropdowns(); }
 function saveCustomers() { storageSet(STORAGE_KEY.CUSTOMERS, allCustomers); cloudPush('customers', allCustomers); }
 
 function updateCustomerUserFilter() {
@@ -592,7 +617,7 @@ function saveCustomer(e) {
 // ================================================================
 //                      订 单
 // ================================================================
-function loadOrders() { allOrders = storageGet(STORAGE_KEY.ORDERS) || []; renderOrderTable(getVisibleOrders()); updateOrderCustomerFilter(); }
+async function loadOrders() { allOrders = storageGet(STORAGE_KEY.ORDERS); if (!allOrders || !allOrders.length) { try { var resp = await fetch('data/orders.json'); if (resp.ok) { allOrders = await resp.json(); storageSet(STORAGE_KEY.ORDERS, allOrders); } else { allOrders = []; } } catch(e) { allOrders = []; } } // 迁移旧数据：payment_screenshot → deposit_screenshot allOrders.forEach(function(o) { if (o.payment_screenshot && !o.deposit_screenshot) { o.deposit_screenshot = o.payment_screenshot; delete o.payment_screenshot; } }); renderOrderTable(getVisibleOrders()); updateOrderCustomerFilter(); }
 function saveOrders() { storageSet(STORAGE_KEY.ORDERS, allOrders); cloudPush('orders', allOrders); }
 
 function updateCustomerDropdowns() {
@@ -615,7 +640,8 @@ function renderOrderTable(orders) {
   var tb = document.getElementById('order-table-body');
   if (!orders || !orders.length) { tb.innerHTML = '<tr><td colspan="9" class="empty-state">暂无订单数据</td></tr>'; return; }
   tb.innerHTML = orders.map(function(o) {
-    var ssBtn = o.payment_screenshot ? ' <button class="btn btn-sm" onclick="viewScreenshot(\'' + o.id + '\')" title="查看结款截图">截图</button>' : '';
+    var depositBtn = o.deposit_screenshot ? ' <button class="btn btn-sm" onclick="viewScreenshot(\'' + o.id + '\',\'deposit\')" title="查看定金截图">定金截图</button>' : '';
+    var balanceBtn = o.balance_screenshot ? ' <button class="btn btn-sm" onclick="viewScreenshot(\'' + o.id + '\',\'balance\')" title="查看尾款截图">尾款截图</button>' : '';
     return '<tr>' +
       '<td><strong>' + esc(getCustName(o.customer_id)) + '</strong></td>' +
       '<td>' + esc(o.product_name || '-') + '</td>' +
@@ -624,7 +650,7 @@ function renderOrderTable(orders) {
       '<td>' + (o.delivery_date || '-') + '</td>' +
       '<td><span class="badge ' + orderBadge(o.status) + '">' + esc(o.status || '沟通中') + '</span></td>' +
       '<td>' + fmtDate(o.created_at) + '</td>' +
-      '<td><div class="action-btns"><button class="btn btn-sm" onclick="openEditOrderModal(\'' + o.id + '\')">编辑</button>' + ssBtn + '<button class="btn btn-sm btn-danger" onclick="openDeleteConfirm(\'order\',\'' + o.id + '\',\'' + esc(o.product_name || '') + '\')">删除</button></div></td></tr>';
+      '<td><div class="action-btns"><button class="btn btn-sm" onclick="openEditOrderModal(\'' + o.id + '\')">编辑</button>' + depositBtn + balanceBtn + '<button class="btn btn-sm btn-danger" onclick="openDeleteConfirm(\'order\',\'' + o.id + '\',\'' + esc(o.product_name || '') + '\')">删除</button></div></td></tr>';
   }).join('');
 }
 
@@ -659,11 +685,17 @@ function openEditOrderModal(id) {
   document.getElementById('order-sample-record').value = o.sample_record || '';
   document.getElementById('order-communication-notes').value = o.communication_notes || '';
   // 显示已有截图
-  if (o.payment_screenshot) {
-    pendingScreenshotData = o.payment_screenshot;
-    document.getElementById('order-screenshot-img').src = o.payment_screenshot;
-    document.getElementById('order-screenshot-preview').style.display = 'block';
-  } else {
+  if (o.deposit_screenshot) {
+    pendingDepositScreenshotData = o.deposit_screenshot;
+    document.getElementById('order-deposit-screenshot-img').src = o.deposit_screenshot;
+    document.getElementById('order-deposit-screenshot-preview').style.display = 'block';
+  }
+  if (o.balance_screenshot) {
+    pendingBalanceScreenshotData = o.balance_screenshot;
+    document.getElementById('order-balance-screenshot-img').src = o.balance_screenshot;
+    document.getElementById('order-balance-screenshot-preview').style.display = 'block';
+  }
+  if (!o.deposit_screenshot && !o.balance_screenshot) {
     clearScreenshotPreview();
   }
   document.getElementById('order-modal').style.display = 'flex';
@@ -671,10 +703,11 @@ function openEditOrderModal(id) {
 
 function closeOrderModal() { document.getElementById('order-modal').style.display = 'none'; editingOrderId = null; clearScreenshotPreview(); }
 
-// ========== 货款结款截图 ==========
-var pendingScreenshotData = '';
+// ========== 定金 / 尾款截图 ==========
+var pendingDepositScreenshotData = '';
+var pendingBalanceScreenshotData = '';
 
-function handleScreenshotUpload(input) {
+function handleScreenshotUpload(input, type) {
   var file = input.files[0];
   if (!file) return;
   if (file.size > 5 * 1024 * 1024) { toast('图片不能超过5MB', 'error'); input.value = ''; return; }
@@ -690,31 +723,51 @@ function handleScreenshotUpload(input) {
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      pendingScreenshotData = canvas.toDataURL('image/jpeg', 0.7);
-      document.getElementById('order-screenshot-img').src = pendingScreenshotData;
-      document.getElementById('order-screenshot-preview').style.display = 'block';
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      if (type === 'deposit') {
+        pendingDepositScreenshotData = dataUrl;
+        document.getElementById('order-deposit-screenshot-img').src = pendingDepositScreenshotData;
+        document.getElementById('order-deposit-screenshot-preview').style.display = 'block';
+      } else {
+        pendingBalanceScreenshotData = dataUrl;
+        document.getElementById('order-balance-screenshot-img').src = pendingBalanceScreenshotData;
+        document.getElementById('order-balance-screenshot-preview').style.display = 'block';
+      }
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
-function removeScreenshot() {
-  pendingScreenshotData = '';
-  document.getElementById('order-screenshot-preview').style.display = 'none';
-  document.getElementById('order-payment-screenshot').value = '';
+function removeScreenshot(type) {
+  if (type === 'deposit') {
+    pendingDepositScreenshotData = '';
+    document.getElementById('order-deposit-screenshot-preview').style.display = 'none';
+    document.getElementById('order-deposit-screenshot').value = '';
+  } else {
+    pendingBalanceScreenshotData = '';
+    document.getElementById('order-balance-screenshot-preview').style.display = 'none';
+    document.getElementById('order-balance-screenshot').value = '';
+  }
 }
 
 function clearScreenshotPreview() {
-  pendingScreenshotData = '';
-  document.getElementById('order-screenshot-preview').style.display = 'none';
-  document.getElementById('order-payment-screenshot').value = '';
+  pendingDepositScreenshotData = '';
+  pendingBalanceScreenshotData = '';
+  document.getElementById('order-deposit-screenshot-preview').style.display = 'none';
+  document.getElementById('order-balance-screenshot-preview').style.display = 'none';
+  document.getElementById('order-deposit-screenshot').value = '';
+  document.getElementById('order-balance-screenshot').value = '';
 }
 
-function viewScreenshot(orderId) {
+function viewScreenshot(orderId, type) {
   var o = allOrders.find(function(x) { return x.id === orderId; });
-  if (!o || !o.payment_screenshot) { toast('没有结款截图', 'error'); return; }
-  document.getElementById('screenshot-full-img').src = o.payment_screenshot;
+  if (!o) { toast('订单不存在', 'error'); return; }
+  var label = type === 'deposit' ? '定金截图' : '尾款截图';
+  var data = type === 'deposit' ? o.deposit_screenshot : o.balance_screenshot;
+  if (!data) { toast('没有' + label, 'error'); return; }
+  document.getElementById('screenshot-full-img').src = data;
+  document.getElementById('screenshot-modal-title').textContent = label;
   document.getElementById('screenshot-modal').style.display = 'flex';
 }
 
@@ -743,11 +796,16 @@ function saveOrder(e) {
     communication_notes: document.getElementById('order-communication-notes').value.trim(),
   };
   // 处理截图：新增截图 > 保留旧截图 > 无截图
-  if (pendingScreenshotData) {
-    d.payment_screenshot = pendingScreenshotData;
-  } else if (editingOrderId) {
-    var oldOrder = allOrders.find(function(x) { return x.id === editingOrderId; });
-    if (oldOrder && oldOrder.payment_screenshot) d.payment_screenshot = oldOrder.payment_screenshot;
+  var oldOrder = editingOrderId ? allOrders.find(function(x) { return x.id === editingOrderId; }) : null;
+  if (pendingDepositScreenshotData) {
+    d.deposit_screenshot = pendingDepositScreenshotData;
+  } else if (oldOrder && oldOrder.deposit_screenshot) {
+    d.deposit_screenshot = oldOrder.deposit_screenshot;
+  }
+  if (pendingBalanceScreenshotData) {
+    d.balance_screenshot = pendingBalanceScreenshotData;
+  } else if (oldOrder && oldOrder.balance_screenshot) {
+    d.balance_screenshot = oldOrder.balance_screenshot;
   }
   if (editingOrderId) {
     var i = allOrders.findIndex(function(x) { return x.id === editingOrderId; });
@@ -1121,8 +1179,8 @@ function bindEvents() {
         }
       }
       if (v === 'dashboard') loadDashboard();
-      if (v === 'customers') loadCustomers();
-      if (v === 'orders') { loadOrders(); updateCustomerDropdowns(); }
+      if (v === 'customers') await loadCustomers();
+      if (v === 'orders') { await loadOrders(); updateCustomerDropdowns(); }
       if (v === 'inventory') { loadMaterialRecords(); }
     });
   });
@@ -1226,7 +1284,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     var loggedUser = sessionStorage.getItem('crm_logged_user');
     if (loggedUser) {
       if (!sessionStorage.getItem('crm_role')) { var u = findUser(loggedUser); if (u) { var allU = getUsers(); var firstU = allU.length > 0 ? allU[0].username : ''; sessionStorage.setItem('crm_role', u.role || ((u.username === firstU) ? '总经理' : '业务员')); } }
-      enterApp(loggedUser); return;
+      await enterApp(loggedUser); return;
     }
   }
   document.getElementById('auth-section').style.display = 'flex';
