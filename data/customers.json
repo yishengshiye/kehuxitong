@@ -1,5 +1,22 @@
 [
   {
+    "name": "线下沈",
+    "company_name": "个体",
+    "country": "云南",
+    "phone": "",
+    "wechat": "",
+    "source": "医圣",
+    "customer_level": "普通",
+    "status": "已成交客户",
+    "first_contact_date": null,
+    "last_contact_date": null,
+    "notes": "",
+    "id": "mqsubcdg_xtptcp",
+    "user_id": "潮汕",
+    "created_at": "2026-06-25T01:45:21.508Z",
+    "updated_at": "2026-06-25T01:45:21.508Z"
+  },
+  {
     "name": "方芳总代发",
     "company_name": "个体",
     "country": "广东河源",
