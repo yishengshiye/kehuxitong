@@ -1,5 +1,22 @@
 [
   {
+    "name": "吴老师",
+    "company_name": "个体",
+    "country": "江西",
+    "phone": "",
+    "wechat": "",
+    "source": "医圣",
+    "customer_level": "普通",
+    "status": "已成交客户",
+    "first_contact_date": null,
+    "last_contact_date": null,
+    "notes": "",
+    "id": "mqtbtc0a_frcfq0",
+    "user_id": "潮汕",
+    "created_at": "2026-06-25T09:55:14.314Z",
+    "updated_at": "2026-06-25T09:55:14.314Z"
+  },
+  {
     "name": "越南客户",
     "company_name": "个体",
     "country": "越南",
