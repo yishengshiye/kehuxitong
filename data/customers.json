@@ -1,5 +1,22 @@
 [
   {
+    "name": "方芳总代发",
+    "company_name": "个体",
+    "country": "广东河源",
+    "phone": "",
+    "wechat": "",
+    "source": "医圣",
+    "customer_level": "普通",
+    "status": "已成交客户",
+    "first_contact_date": null,
+    "last_contact_date": null,
+    "notes": "",
+    "id": "mqsu881h_rekh99",
+    "user_id": "潮汕",
+    "created_at": "2026-06-25T01:42:55.925Z",
+    "updated_at": "2026-06-25T01:42:55.925Z"
+  },
+  {
     "name": "线下赵",
     "company_name": "个体",
     "country": "山东济南",
