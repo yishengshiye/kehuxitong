@@ -102,7 +102,7 @@
     "quotation_price": "1",
     "order_quantity": "100",
     "delivery_date": null,
-    "status": "已完成",
+    "status": "生产中",
     "tax_included": "不含税",
     "shipping_included": "不含运费",
     "sample_record": "",
@@ -111,7 +111,7 @@
     "id": "mqtbuytv_24e2hr",
     "user_id": "潮汕",
     "created_at": "2026-06-25T09:56:30.547Z",
-    "updated_at": "2026-06-25T09:56:30.547Z"
+    "updated_at": "2026-06-27T06:42:10.622Z"
   },
   {
     "customer_id": "mqsu881h_rekh99",
